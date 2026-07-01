@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AJFLUX — Network QoS Monitor</title>
+{% load static %}
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vis-network@9.1.9/dist/vis-network.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<script>
+tailwind.config = {
+  darkMode:'class',
+  theme:{ extend:{
+    colors:{
+      'primary':'#a2c9ff','primary-container':'#0068b5','on-primary':'#00315b',
+      'secondary':'#b2c7f1','tertiary':'#ffb68c','error':'#ffb4ab',
+      'error-container':'#93000a','surface':'#10131a',
+      'surface-container-lowest':'#0b0e15','surface-container-low':'#191c22',
+      'surface-container':'#1d2027','surface-container-high':'#272a31',
+      'surface-container-highest':'#32353c','on-surface':'#e0e2ec',
+      'on-surface-variant':'#c2c6d4','outline':'#8c919d','outline-variant':'#424752',
+    },
+    fontFamily:{ sans:['Inter','sans-serif'] },
+    borderRadius:{ DEFAULT:'0.125rem',lg:'0.5rem',xl:'0.75rem','2xl':'1rem',full:'9999px' }
+  }}
+}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#0b0e15;color:#e0e2ec;min-height:100vh;overflow-x:hidden}
+.material-symbols-outlined{font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;vertical-align:middle}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#0b0e15}::-webkit-scrollbar-thumb{background:#424752;border-radius:2px}
+.page{display:none;animation:fadeIn .3s ease}.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(1.5)}}
+.pulse-ring{animation:pulse 2s ease-in-out infinite}
+.gradient-text{background:linear-gradient(135deg,#a2c9ff,#0068b5);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.card-hover{transition:background .2s}.card-hover:hover{background:#272a31!important}
+.chip-online{background:rgba(162,201,255,.1);color:#a2c9ff;border:1px solid rgba(162,201,255,.2)}
+.chip-offline{background:rgba(255,180,171,.1);color:#ffb4ab;border:1px solid rgba(255,180,171,.2)}
+.chip-warning{background:rgba(255,182,140,.1);color:#ffb68c;border:1px solid rgba(255,182,140,.2)}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;background:#32353c;border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#a2c9ff;cursor:pointer}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.radar-spin{animation:spin 2s linear infinite}
+#scan-overlay{position:fixed;inset:0;background:rgba(11,14,21,.9);backdrop-filter:blur(6px);z-index:9999;display:none;align-items:center;justify-content:center;flex-direction:column;gap:20px}
+#scan-overlay.active{display:flex}
+#device-modal{position:fixed;inset:0;background:rgba(11,14,21,.8);backdrop-filter:blur(8px);z-index:8000;display:none;align-items:center;justify-content:center;padding:16px}
+#device-modal.active{display:flex}
+.chart-wrap{position:relative;height:200px}
+#topology-container{width:100%;height:520px;background:#10131a;border-radius:1rem;border:1px solid #424752}
+.status-bar{height:3px;background:#1d2027;border-radius:2px;overflow:hidden}
+.status-bar-fill{height:100%;background:linear-gradient(90deg,#a2c9ff,#0068b5);border-radius:2px;transition:width .4s ease}
+</style>
+</head>
+<body>
+
+<!-- SCAN OVERLAY -->
+<div id="scan-overlay">
+  <span class="material-symbols-outlined text-7xl text-primary radar-spin">radar</span>
+  <p class="text-on-surface font-bold text-lg tracking-widest uppercase">Escaneando Red...</p>
+  <div class="w-72 space-y-2">
+    <div class="status-bar"><div id="scan-bar" class="status-bar-fill" style="width:0%"></div></div>
+    <p id="scan-status" class="text-on-surface-variant text-sm font-mono text-center">Iniciando...</p>
+  </div>
+</div>
+
+<!-- DEVICE MODAL -->
+<div id="device-modal">
+  <div class="bg-surface-container rounded-2xl w-full max-w-lg shadow-[0_24px_48px_rgba(0,0,0,.6)]">
+    <div class="flex items-center justify-between p-6 border-b border-outline-variant/20">
+      <div class="flex items-center gap-3">
+        <span id="modal-icon" class="material-symbols-outlined text-2xl text-primary">router</span>
+        <div>
+          <h3 id="modal-name" class="font-bold text-on-surface text-lg"></h3>
+          <p id="modal-vendor" class="text-xs text-outline uppercase tracking-wider"></p>
+        </div>
+      </div>
+      <button onclick="closeModal()" class="text-on-surface-variant hover:text-on-surface transition-colors">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-surface-container-low p-4 rounded-xl">
+          <p class="text-xs text-outline uppercase tracking-wider mb-1">IP Address</p>
+          <p id="modal-ip" class="font-mono font-bold text-on-surface"></p>
+        </div>
+        <div class="bg-surface-container-low p-4 rounded-xl">
+          <p class="text-xs text-outline uppercase tracking-wider mb-1">MAC Address</p>
+          <p id="modal-mac" class="font-mono text-sm text-on-surface-variant"></p>
+        </div>
+        <div class="bg-surface-container-low p-4 rounded-xl">
+          <p class="text-xs text-outline uppercase tracking-wider mb-1">Latencia</p>
+          <p id="modal-latency" class="font-bold text-2xl gradient-text"></p>
+        </div>
+        <div class="bg-surface-container-low p-4 rounded-xl">
+          <p class="text-xs text-outline uppercase tracking-wider mb-1">Jitter</p>
+          <p id="modal-jitter" class="font-bold text-2xl text-tertiary"></p>
+        </div>
+        <div class="bg-surface-container-low p-4 rounded-xl">
+          <p class="text-xs text-outline uppercase tracking-wider mb-1">Packet Loss</p>
+          <p id="modal-loss" class="font-bold text-2xl text-on-surface"></p>
+        </div>
+        <div class="bg-surface-container-low p-4 rounded-xl">
+          <p class="text-xs text-outline uppercase tracking-wider mb-1">QoS Score</p>
+          <p id="modal-qos" class="font-bold text-2xl"></p>
+        </div>
+      </div>
+      <div class="bg-surface-container-low p-4 rounded-xl">
+        <p class="text-xs text-outline uppercase tracking-wider mb-1">Puertos Abiertos</p>
+        <p id="modal-ports" class="font-mono text-sm text-on-surface-variant"></p>
+      </div>
+      <div class="bg-surface-container-low p-4 rounded-xl">
+        <p class="text-xs text-outline uppercase tracking-wider mb-2">Historial de Latencia</p>
+        <div class="chart-wrap"><canvas id="modal-chart"></canvas></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="flex min-h-screen">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="fixed left-0 top-0 h-full z-40 flex flex-col bg-surface-container-lowest w-64 shadow-[4px_0_24px_rgba(0,0,0,.4)] transition-transform duration-300 -translate-x-full md:translate-x-0">
+    <div class="p-6 mb-4">
+      <span class="text-2xl font-black tracking-tighter gradient-text">AJFLUX</span>
+      <p class="text-xs text-outline mt-0.5 uppercase tracking-wider">QoS Monitor v3.0</p>
+    </div>
+    <nav class="flex-1 px-3 space-y-1">
+      <a onclick="navigate('overview')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low" data-page="overview">
+        <span class="material-symbols-outlined text-xl">dashboard</span><span class="font-medium text-sm">Overview</span>
+      </a>
+      <a onclick="navigate('devices')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low" data-page="devices">
+        <span class="material-symbols-outlined text-xl">router</span><span class="font-medium text-sm">Dispositivos</span>
+      </a>
+      <a onclick="navigate('metrics')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low" data-page="metrics">
+        <span class="material-symbols-outlined text-xl">monitoring</span><span class="font-medium text-sm">Métricas</span>
+      </a>
+      <a onclick="navigate('topology')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low" data-page="topology">
+        <span class="material-symbols-outlined text-xl">account_tree</span><span class="font-medium text-sm">Topología</span>
+      </a>
+      <a onclick="navigate('reports')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low" data-page="reports">
+        <span class="material-symbols-outlined text-xl">description</span><span class="font-medium text-sm">Reportes</span>
+      </a>
+      <a onclick="navigate('settings')" class="nav-link flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low" data-page="settings">
+        <span class="material-symbols-outlined text-xl">settings</span><span class="font-medium text-sm">Configuración</span>
+      </a>
+    </nav>
+    <!-- Connection status -->
+    <div class="p-4 mx-3 mb-2 bg-surface-container rounded-xl">
+      <div class="flex items-center gap-3">
+        <div id="conn-dot" class="w-2 h-2 rounded-full bg-primary pulse-ring"></div>
+        <div>
+          <p class="text-xs font-bold text-on-surface">Estado</p>
+          <p id="conn-text" class="text-xs text-primary">Conectando...</p>
+        </div>
+      </div>
+    </div>
+    <div class="p-4 mx-3 mb-4 bg-surface-container rounded-xl">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-primary text-sm">lan</span>
+        <div>
+          <p class="text-xs font-bold text-on-surface">Red Local</p>
+          <p id="sidebar-network" class="text-xs text-primary">Detectando...</p>
+        </div>
+      </div>
+    </div>
+    <div class="p-4 border-t border-outline-variant/20">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-primary-container flex items-center justify-center text-on-primary text-sm font-bold">AD</div>
+        <div>
+          <p class="text-sm font-semibold text-on-surface">Admin</p>
+          <p class="text-xs text-outline">admin@ajflux.net</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 md:ml-64 flex flex-col min-h-screen">
+
+    <!-- TOPBAR -->
+    <header class="sticky top-0 z-30 flex items-center justify-between px-6 h-16 bg-surface-container-lowest/80 backdrop-blur-xl border-b border-outline-variant/10">
+      <div class="flex items-center gap-4">
+        <button onclick="toggleSidebar()" class="md:hidden text-on-surface-variant"><span class="material-symbols-outlined">menu</span></button>
+        <p id="page-title" class="text-xs font-bold uppercase tracking-widest text-primary">Inteligencia de Red</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span id="live-clock" class="text-xs font-mono text-outline hidden sm:block"></span>
+        <div class="flex items-center gap-2">
+          <span id="live-dot" class="w-1.5 h-1.5 rounded-full bg-primary pulse-ring"></span>
+          <span id="live-label" class="text-xs font-bold text-on-surface-variant hidden sm:block">En vivo</span>
+        </div>
+        <button onclick="triggerScan()" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-on-surface-variant hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-surface-container">
+          <span class="material-symbols-outlined text-lg">radar</span><span class="hidden sm:block">Escanear</span>
+        </button>
+      </div>
+    </header>
+
+    <div class="flex-1 p-6 pb-24 md:pb-8">
+
+      <!-- ═══ OVERVIEW ═══ -->
+      <div id="page-overview" class="page">
+        <div class="mb-8">
+          <h2 class="text-4xl font-black tracking-tight text-on-surface mb-2">Overview</h2>
+          <p class="text-on-surface-variant">Salud de red en tiempo real — dispositivos reales de tu red local.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div class="bg-surface-container-low p-6 rounded-2xl card-hover">
+            <div class="flex items-start justify-between mb-4">
+              <p class="text-xs font-bold uppercase tracking-widest text-outline">Total Dispositivos</p>
+              <span class="material-symbols-outlined text-on-surface-variant opacity-50">devices</span>
+            </div>
+            <p class="text-5xl font-black text-on-surface mb-1" id="stat-total">—</p>
+            <p class="text-xs text-primary" id="stat-network">Ejecuta un escaneo</p>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl card-hover">
+            <div class="flex items-start justify-between mb-4">
+              <p class="text-xs font-bold uppercase tracking-widest text-outline">Online Ahora</p>
+              <span class="material-symbols-outlined text-primary opacity-50">wifi</span>
+            </div>
+            <p class="text-5xl font-black text-on-surface mb-1" id="stat-online">—</p>
+            <p class="text-xs text-on-surface-variant" id="stat-online-pct">— nodos activos</p>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl card-hover">
+            <div class="flex items-start justify-between mb-4">
+              <p class="text-xs font-bold uppercase tracking-widest text-outline">QoS Promedio</p>
+              <span class="material-symbols-outlined text-tertiary opacity-50">speed</span>
+            </div>
+            <p class="text-5xl font-black gradient-text mb-1" id="stat-qos">—</p>
+            <p class="text-xs text-primary" id="stat-qos-label">Calculando...</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+          <!-- Gauge -->
+          <div class="bg-surface-container-low p-6 rounded-2xl flex flex-col items-center">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline mb-4 self-start">Salud de Red</p>
+            <div class="relative w-40 h-40">
+              <svg viewBox="0 0 140 140" class="w-full h-full -rotate-90">
+                <circle cx="70" cy="70" r="58" fill="none" stroke="#32353c" stroke-width="10"/>
+                <circle id="gauge-circle" cx="70" cy="70" r="58" fill="none" stroke="url(#gaugeGrad)" stroke-width="10"
+                  stroke-linecap="round" stroke-dasharray="364.4" stroke-dashoffset="364.4" style="transition:stroke-dashoffset 1s ease"/>
+                <defs>
+                  <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#a2c9ff"/><stop offset="100%" stop-color="#0068b5"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              <div class="absolute inset-0 flex flex-col items-center justify-center">
+                <span id="gauge-val" class="text-4xl font-black text-on-surface">—</span>
+                <span id="gauge-label" class="text-xs text-outline uppercase tracking-wider">CARGANDO</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4 w-full">
+              <div class="text-center">
+                <p class="text-xs text-outline uppercase tracking-wider">Latencia</p>
+                <p id="avg-latency" class="font-bold text-on-surface text-sm">—</p>
+              </div>
+              <div class="text-center">
+                <p class="text-xs text-outline uppercase tracking-wider">Jitter</p>
+                <p id="avg-jitter" class="font-bold text-on-surface text-sm">—</p>
+              </div>
+            </div>
+          </div>
+          <!-- Alerts -->
+          <div class="lg:col-span-2 bg-surface-container-low p-6 rounded-2xl">
+            <div class="flex items-center justify-between mb-4">
+              <p class="text-xs font-bold uppercase tracking-widest text-outline">Alertas Activas</p>
+              <span id="alert-badge" class="text-xs bg-error-container text-error px-2 py-0.5 rounded-full hidden">0</span>
+            </div>
+            <div id="alerts-list" class="space-y-2 max-h-56 overflow-y-auto">
+              <div class="text-center py-8 text-outline text-sm">
+                <span class="material-symbols-outlined text-3xl block mb-2 opacity-30">notifications_off</span>Sin alertas activas
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global chart -->
+        <div class="bg-surface-container-low p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-4">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline">Latencia Promedio Global</p>
+            <span id="global-avg-display" class="text-xs font-mono font-bold text-primary">—</span>
+          </div>
+          <div class="chart-wrap"><canvas id="overview-chart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- ═══ DEVICES ═══ -->
+      <div id="page-devices" class="page">
+        <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <h2 class="text-4xl font-black tracking-tight text-on-surface mb-2">Dispositivos</h2>
+            <p class="text-on-surface-variant">Todos los dispositivos detectados en tu red real.</p>
+          </div>
+          <div class="flex gap-2">
+            <input id="device-search" oninput="filterDevices()" type="text" placeholder="Buscar IP, hostname..."
+              class="bg-surface-container px-4 py-2 rounded-xl text-sm text-on-surface outline-none focus:ring-1 focus:ring-primary/40 w-44"/>
+            <select id="device-filter" onchange="filterDevices()" class="bg-surface-container px-3 py-2 rounded-xl text-sm text-on-surface outline-none">
+              <option value="all">Todos</option><option value="online">Online</option>
+              <option value="offline">Offline</option><option value="warning">Alerta</option>
+            </select>
+          </div>
+        </div>
+        <div class="bg-surface-container-low rounded-2xl overflow-hidden">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-outline-variant/20">
+                <th class="text-left px-6 py-4 text-xs font-bold uppercase tracking-widest text-outline">Dispositivo</th>
+                <th class="text-left px-4 py-4 text-xs font-bold uppercase tracking-widest text-outline hidden md:table-cell">IP / MAC</th>
+                <th class="text-left px-4 py-4 text-xs font-bold uppercase tracking-widest text-outline hidden lg:table-cell">Fabricante / Tipo</th>
+                <th class="text-right px-4 py-4 text-xs font-bold uppercase tracking-widest text-outline">Latencia</th>
+                <th class="text-right px-4 py-4 text-xs font-bold uppercase tracking-widest text-outline hidden sm:table-cell">Jitter</th>
+                <th class="text-right px-4 py-4 text-xs font-bold uppercase tracking-widest text-outline hidden sm:table-cell">Loss</th>
+                <th class="text-right px-6 py-4 text-xs font-bold uppercase tracking-widest text-outline">QoS</th>
+              </tr>
+            </thead>
+            <tbody id="device-tbody">
+              <tr><td colspan="7" class="text-center py-16 text-outline">
+                <span class="material-symbols-outlined text-4xl block mb-3 opacity-30">radar</span>
+                Haz clic en <strong>Escanear</strong> para descubrir dispositivos
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ METRICS ═══ -->
+      <div id="page-metrics" class="page">
+        <div class="mb-8">
+          <h2 class="text-4xl font-black tracking-tight text-on-surface mb-2">Métricas QoS</h2>
+          <p class="text-on-surface-variant">Latencia, jitter y packet loss en tiempo real por dispositivo.</p>
+        </div>
+        <div class="flex flex-wrap gap-2 mb-6" id="metric-device-btns"></div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline mb-4">Latencia (ms)</p>
+            <div class="chart-wrap"><canvas id="chart-latency"></canvas></div>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline mb-4">Jitter (ms)</p>
+            <div class="chart-wrap"><canvas id="chart-jitter"></canvas></div>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline mb-4">Packet Loss (%)</p>
+            <div class="chart-wrap"><canvas id="chart-loss"></canvas></div>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline mb-4">QoS Score</p>
+            <div class="chart-wrap"><canvas id="chart-qos"></canvas></div>
+          </div>
+        </div>
+        <div class="bg-surface-container-low rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-outline-variant/20">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline">Resumen por Dispositivo</p>
+          </div>
+          <table class="w-full">
+            <thead><tr class="border-b border-outline-variant/10">
+              <th class="text-left px-6 py-3 text-xs font-bold uppercase tracking-wider text-outline">Host</th>
+              <th class="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-outline">Latencia</th>
+              <th class="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-outline">Jitter</th>
+              <th class="text-right px-4 py-3 text-xs font-bold uppercase tracking-wider text-outline">Loss</th>
+              <th class="text-right px-6 py-3 text-xs font-bold uppercase tracking-wider text-outline">QoS</th>
+            </tr></thead>
+            <tbody id="metrics-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ TOPOLOGY ═══ -->
+      <div id="page-topology" class="page">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-4">
+          <div>
+            <h2 class="text-4xl font-black tracking-tight text-on-surface mb-2">Topología de Red</h2>
+            <p class="text-on-surface-variant">Mapa visual interactivo de todos los dispositivos conectados.</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="refreshTopology()" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-4 py-2 bg-surface-container-high rounded-xl hover:bg-surface-bright transition-colors text-on-surface-variant hover:text-primary">
+              <span class="material-symbols-outlined text-lg">refresh</span>Actualizar
+            </button>
+            <button onclick="fitTopology()" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-4 py-2 bg-surface-container-high rounded-xl hover:bg-surface-bright transition-colors text-on-surface-variant">
+              <span class="material-symbols-outlined text-lg">fit_screen</span>Ajustar
+            </button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-4 mb-4 text-xs text-on-surface-variant">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#a2c9ff;margin-right:5px"></span>Gateway/Router</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#4ade80;margin-right:5px"></span>Online</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ffb68c;margin-right:5px"></span>Alerta</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#ffb4ab;margin-right:5px"></span>Offline</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#b2c7f1;margin-right:5px"></span>Este servidor</span>
+        </div>
+        <div id="topology-container"></div>
+        <div id="topo-info" class="mt-4 bg-surface-container-low p-5 rounded-xl hidden">
+          <div class="flex items-center gap-4 flex-wrap">
+            <span id="topo-icon" class="material-symbols-outlined text-3xl text-primary">router</span>
+            <div>
+              <p id="topo-name" class="font-bold text-on-surface text-lg"></p>
+              <p id="topo-detail" class="text-xs text-outline"></p>
+            </div>
+            <div class="ml-auto grid grid-cols-4 gap-6 text-center">
+              <div><p class="text-xs text-outline">Latencia</p><p id="topo-lat" class="font-bold text-on-surface">—</p></div>
+              <div><p class="text-xs text-outline">Jitter</p><p id="topo-jitter" class="font-bold text-on-surface">—</p></div>
+              <div><p class="text-xs text-outline">QoS</p><p id="topo-qos" class="font-bold text-on-surface">—</p></div>
+              <div><p class="text-xs text-outline">Estado</p><p id="topo-status" class="font-bold">—</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ REPORTS ═══ -->
+      <div id="page-reports" class="page">
+        <div class="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <h2 class="text-4xl font-black tracking-tight text-on-surface mb-2">Reportes</h2>
+            <p class="text-on-surface-variant">Historial completo de escaneos y snapshot de dispositivos.</p>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="exportAllDevices()" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-4 py-2 bg-surface-container-high rounded-xl hover:bg-surface-bright transition-colors text-on-surface-variant">
+              <span class="material-symbols-outlined text-lg">download</span>Exportar JSON
+            </button>
+            <button onclick="triggerScan()" class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider px-4 py-2 bg-gradient-to-r from-primary to-primary-container text-on-primary rounded-xl hover:opacity-90 transition-opacity">
+              <span class="material-symbols-outlined text-lg">radar</span>Nuevo Escaneo
+            </button>
+          </div>
+        </div>
+        <div class="bg-surface-container-low p-6 rounded-2xl mb-6">
+          <div class="flex items-center gap-3 mb-5">
+            <span class="material-symbols-outlined text-primary">devices</span>
+            <p class="text-xs font-bold uppercase tracking-widest text-on-surface">Dispositivos Conectados Actualmente</p>
+            <span id="report-device-count" class="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">0</span>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead><tr class="border-b border-outline-variant/20 text-xs font-bold uppercase tracking-wider text-outline">
+                <th class="text-left py-3">IP</th>
+                <th class="text-left py-3">Hostname</th>
+                <th class="text-left py-3 hidden md:table-cell">MAC</th>
+                <th class="text-left py-3 hidden lg:table-cell">Fabricante</th>
+                <th class="text-left py-3">Tipo</th>
+                <th class="text-right py-3">Estado</th>
+                <th class="text-right py-3">Latencia</th>
+                <th class="text-right py-3">Jitter</th>
+                <th class="text-right py-3">Loss</th>
+                <th class="text-right py-3">QoS</th>
+              </tr></thead>
+              <tbody id="report-devices-tbody">
+                <tr><td colspan="10" class="text-center py-8 text-outline text-sm">Sin datos — ejecuta un escaneo</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="bg-surface-container-low rounded-2xl overflow-hidden">
+          <div class="px-6 py-4 border-b border-outline-variant/20">
+            <p class="text-xs font-bold uppercase tracking-widest text-outline">Historial de Escaneos</p>
+          </div>
+          <div id="reports-list">
+            <div class="text-center py-12 text-outline text-sm">
+              <span class="material-symbols-outlined text-4xl block mb-2 opacity-30">history</span>Sin escaneos registrados
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SETTINGS ═══ -->
+      <div id="page-settings" class="page">
+        <div class="mb-8">
+          <h2 class="text-4xl font-black tracking-tight text-on-surface mb-2">Configuración</h2>
+          <p class="text-on-surface-variant">Información de red y umbrales de alerta.</p>
+        </div>
+        <div class="space-y-4">
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <div class="flex items-center gap-3 mb-5">
+              <span class="material-symbols-outlined text-primary">wifi_tethering</span>
+              <p class="text-xs font-bold uppercase tracking-widest text-on-surface">Interfaces de Red Detectadas</p>
+            </div>
+            <div id="network-info-panel"><p class="text-sm text-outline">Cargando...</p></div>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <div class="flex items-center gap-3 mb-5">
+              <span class="material-symbols-outlined text-tertiary">notifications_active</span>
+              <p class="text-xs font-bold uppercase tracking-widest text-on-surface">Umbrales de Alerta</p>
+            </div>
+            <div class="space-y-5">
+              <div>
+                <div class="flex justify-between mb-2">
+                  <label class="text-xs text-outline uppercase tracking-wider">Latencia Crítica</label>
+                  <span id="lbl-latency" class="text-xs font-mono font-bold text-on-surface">150ms</span>
+                </div>
+                <input type="range" id="thr-latency" min="10" max="500" value="150" oninput="updateThreshold('latency',this.value)"/>
+              </div>
+              <div>
+                <div class="flex justify-between mb-2">
+                  <label class="text-xs text-outline uppercase tracking-wider">Packet Loss Límite</label>
+                  <span id="lbl-loss" class="text-xs font-mono font-bold text-on-surface">0.5%</span>
+                </div>
+                <input type="range" id="thr-loss" min="0" max="20" step="0.1" value="0.5" oninput="updateThreshold('loss',this.value)"/>
+              </div>
+              <div>
+                <div class="flex justify-between mb-2">
+                  <label class="text-xs text-outline uppercase tracking-wider">Jitter Tolerancia</label>
+                  <span id="lbl-jitter" class="text-xs font-mono font-bold text-on-surface">20ms</span>
+                </div>
+                <input type="range" id="thr-jitter" min="1" max="100" value="20" oninput="updateThreshold('jitter',this.value)"/>
+              </div>
+            </div>
+          </div>
+          <div class="bg-surface-container-low p-6 rounded-2xl">
+            <div class="flex items-center gap-3 mb-5">
+              <span class="material-symbols-outlined text-on-surface-variant">database</span>
+              <p class="text-xs font-bold uppercase tracking-widest text-on-surface">Acciones</p>
+            </div>
+            <div class="space-y-2">
+              <button onclick="triggerScan()" class="w-full flex items-center justify-between px-5 py-4 bg-surface-container rounded-xl hover:bg-surface-container-high transition-colors">
+                <span class="text-sm font-bold text-on-surface uppercase tracking-wider">Escaneo Manual</span>
+                <span class="material-symbols-outlined text-primary">bolt</span>
+              </button>
+              <button onclick="exportAllDevices()" class="w-full flex items-center justify-between px-5 py-4 bg-surface-container rounded-xl hover:bg-surface-container-high transition-colors">
+                <span class="text-sm font-bold text-on-surface uppercase tracking-wider">Exportar JSON</span>
+                <span class="material-symbols-outlined text-on-surface-variant">download</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let DEVICES = [], ALERTS = [], TOPOLOGY = {nodes:[],edges:[]}, REPORTS = [];
+let globalHistory = Array(60).fill(null);
+let overviewChart = null, modalChart = null, topoNetwork = null;
+let currentPage = 'overview', currentMetricDevice = null;
+let _scanPolling = null;
+
+// ═══════════════════════════════════════════════════
+// POLLING — reemplaza WebSocket completamente
+// ═══════════════════════════════════════════════════
+function startPolling() {
+  setConn('online');
+  pollLive();
+  setInterval(pollLive, 8000); // cada 8 segundos
+}
+
+function pollLive() {
+  fetch('/api/live/')
+    .then(r => r.json())
+    .then(data => {
+      setConn('online');
+      if (data.devices) {
+        DEVICES = data.devices;
+        onDevicesUpdate();
+      }
+      if (data.alerts) {
+        ALERTS = data.alerts;
+        renderAlerts();
+      }
+      // Si hay escaneo en curso, actualizar overlay
+      if (data.scan && data.scan.running) {
+        document.getElementById('scan-overlay').classList.add('active');
+        document.getElementById('scan-bar').style.width = data.scan.progress + '%';
+        document.getElementById('scan-status').textContent = data.scan.message || 'Escaneando...';
+      } else if (!data.scan.running && document.getElementById('scan-overlay').classList.contains('active')) {
+        // Escaneo terminó
+        document.getElementById('scan-bar').style.width = '100%';
+        document.getElementById('scan-status').textContent = 'Escaneo completado';
+        setTimeout(() => {
+          document.getElementById('scan-overlay').classList.remove('active');
+          document.getElementById('scan-bar').style.width = '0%';
+          // Recargar topología y reportes
+          fetchTopology();
+          fetchReports();
+        }, 1000);
+      }
+    })
+    .catch(() => setConn('offline'));
+}
+
+function setConn(state) {
+  const dot = document.getElementById('conn-dot');
+  const txt = document.getElementById('conn-text');
+  const liveDot = document.getElementById('live-dot');
+  const liveLabel = document.getElementById('live-label');
+  if (state === 'online') {
+    dot.className = 'w-2 h-2 rounded-full bg-primary pulse-ring';
+    txt.textContent = 'En línea'; txt.className = 'text-xs text-primary';
+    liveDot.className = 'w-1.5 h-1.5 rounded-full bg-primary pulse-ring';
+    liveLabel.textContent = 'En vivo';
+  } else {
+    dot.className = 'w-2 h-2 rounded-full bg-error';
+    txt.textContent = 'Sin conexión'; txt.className = 'text-xs text-error';
+    liveDot.className = 'w-1.5 h-1.5 rounded-full bg-error';
+    liveLabel.textContent = 'Offline';
+  }
+}
+
+function fetchTopology() {
+  fetch('/api/topology/').then(r=>r.json()).then(d=>{
+    TOPOLOGY = d.topology || {nodes:[],edges:[]};
+    if (currentPage === 'topology') renderTopology();
+  }).catch(()=>{});
+}
+
+function fetchReports() {
+  fetch('/api/reports/').then(r=>r.json()).then(d=>{
+    REPORTS = d.reports || [];
+    if (currentPage === 'reports') renderReports();
+  }).catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════════
+// SCAN
+// ═══════════════════════════════════════════════════
+function triggerScan() {
+  document.getElementById('scan-overlay').classList.add('active');
+  document.getElementById('scan-bar').style.width = '2%';
+  document.getElementById('scan-status').textContent = 'Enviando solicitud de escaneo...';
+  fetch('/api/scan/', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+    .then(r=>r.json())
+    .then(d=>{
+      if (!d.ok) {
+        document.getElementById('scan-status').textContent = d.msg || 'Error';
+        setTimeout(()=>document.getElementById('scan-overlay').classList.remove('active'), 2000);
+      }
+      // El overlay se actualiza automáticamente via pollLive()
+    })
+    .catch(()=>{
+      document.getElementById('scan-overlay').classList.remove('active');
+    });
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════
+const PAGE_TITLES = {
+  overview:'Vista General', devices:'Dispositivos de Red',
+  metrics:'Métricas QoS', topology:'Topología de Red',
+  reports:'Reportes & Historial', settings:'Configuración'
+};
+
+function navigate(page) {
+  currentPage = page;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('.nav-link').forEach(l=>{
+    const active = l.dataset.page === page;
+    l.classList.toggle('bg-primary/10', active);
+    l.classList.toggle('text-primary', active);
+    l.classList.toggle('text-on-surface-variant', !active);
+  });
+  document.getElementById('page-title').textContent = PAGE_TITLES[page] || page;
+  if (window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
+  if (page === 'overview') setTimeout(initOverviewChart, 50);
+  if (page === 'metrics') renderMetrics();
+  if (page === 'topology') { fetchTopology(); }
+  if (page === 'reports') { fetchReports(); renderReportDevices(); }
+  if (page === 'settings') loadNetworkInfo();
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('-translate-x-full');
+}
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+const ICONS = {router:'router',switch:'device_hub',wifi:'wifi_tethering',server:'dns',
+  desktop:'computer',laptop:'laptop',phone:'smartphone',tablet:'tablet_android',
+  tv:'tv',camera:'videocam',printer:'print',iot:'memory',unknown:'devices_other'};
+function dIcon(t){ return ICONS[t]||'devices_other'; }
+function qosColor(v){ if(!v&&v!==0)return'text-outline'; if(v>=80)return'text-primary'; if(v>=60)return'text-tertiary'; return'text-error'; }
+function latColor(v){ if(!v)return'text-outline'; if(v<50)return'text-primary'; if(v<150)return'text-tertiary'; return'text-error'; }
+function fLat(v){ return v!=null?v.toFixed(0)+'ms':'—'; }
+function fJit(v){ return v!=null?v.toFixed(1)+'ms':'—'; }
+function fLoss(v){ return v!=null?v.toFixed(1)+'%':'—'; }
+function fQos(v){ return v!=null?v.toFixed(0)+'%':'—'; }
+
+// ═══════════════════════════════════════════════════
+// ON DEVICES UPDATE
+// ═══════════════════════════════════════════════════
+function onDevicesUpdate() {
+  renderOverviewStats();
+  if (currentPage === 'devices') renderDevices();
+  if (currentPage === 'reports') renderReportDevices();
+}
+
+// ═══════════════════════════════════════════════════
+// OVERVIEW STATS
+// ═══════════════════════════════════════════════════
+function renderOverviewStats() {
+  const total = DEVICES.length;
+  const online = DEVICES.filter(d=>d.status==='online').length;
+  const warn = DEVICES.filter(d=>d.status==='warning').length;
+  const active = online + warn;
+  const onlineDevs = DEVICES.filter(d=>d.latency!=null && d.status!=='offline');
+  const avgQos = onlineDevs.length ? Math.round(onlineDevs.reduce((s,d)=>s+(d.qos||0),0)/onlineDevs.length) : null;
+  const avgLat = onlineDevs.length ? onlineDevs.reduce((s,d)=>s+(d.latency||0),0)/onlineDevs.length : null;
+  const avgJit = onlineDevs.length ? onlineDevs.reduce((s,d)=>s+(d.jitter||0),0)/onlineDevs.length : null;
+
+  document.getElementById('stat-total').textContent = total||'—';
+  document.getElementById('stat-online').textContent = active||'—';
+  document.getElementById('stat-online-pct').textContent = total?`${Math.round(active/total*100)}% nodos activos`:'—';
+  document.getElementById('stat-qos').textContent = avgQos!=null?avgQos:'—';
+  document.getElementById('avg-latency').textContent = avgLat!=null?avgLat.toFixed(0)+'ms':'—';
+  document.getElementById('avg-jitter').textContent = avgJit!=null?avgJit.toFixed(1)+'ms':'—';
+  document.getElementById('global-avg-display').textContent = avgLat!=null?avgLat.toFixed(0)+'ms':'—';
+  const lbl = avgQos>=90?'EXCELENTE':avgQos>=70?'BUENO':avgQos>=50?'REGULAR':'CRÍTICO';
+  document.getElementById('stat-qos-label').textContent = avgQos!=null?lbl:'Calculando...';
+  document.getElementById('gauge-label').textContent = avgQos!=null?lbl:'CARGANDO';
+  document.getElementById('gauge-val').textContent = avgQos!=null?avgQos:'—';
+  if (avgQos!=null) {
+    const offset = 364.4 - (364.4 * avgQos/100);
+    document.getElementById('gauge-circle').setAttribute('stroke-dashoffset', offset);
+  }
+  if (avgLat!=null) { globalHistory.push(+avgLat.toFixed(1)); globalHistory.shift(); updateOverviewChart(); }
+}
+
+// ═══════════════════════════════════════════════════
+// ALERTS
+// ═══════════════════════════════════════════════════
+function renderAlerts() {
+  const list = document.getElementById('alerts-list');
+  const badge = document.getElementById('alert-badge');
+  if (!ALERTS.length) {
+    list.innerHTML = '<div class="text-center py-8 text-outline text-sm"><span class="material-symbols-outlined text-3xl block mb-2 opacity-30">notifications_off</span>Sin alertas activas</div>';
+    badge.classList.add('hidden'); return;
+  }
+  badge.textContent = ALERTS.length; badge.classList.remove('hidden');
+  const icons = {critical:'error',warning:'warning',info:'info'};
+  const colors = {critical:'text-error',warning:'text-tertiary',info:'text-primary'};
+  list.innerHTML = ALERTS.slice(0,8).map(a=>{
+    const ts = new Date(a.timestamp).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+    return `<div class="flex items-start gap-3 px-4 py-3 bg-surface-container rounded-xl">
+      <span class="material-symbols-outlined text-lg ${colors[a.level]||'text-primary'}">${icons[a.level]||'info'}</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm text-on-surface">${a.message}</p>
+        <p class="text-xs text-outline">${a.device_ip||''} · ${ts}</p>
+      </div>
+      <button onclick="resolveAlert(${a.id})" class="text-outline hover:text-on-surface transition-colors flex-shrink-0">
+        <span class="material-symbols-outlined text-sm">close</span>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function resolveAlert(id) {
+  fetch(`/api/alerts/${id}/resolve/`,{method:'POST'}).then(()=>{
+    ALERTS = ALERTS.filter(a=>a.id!==id); renderAlerts();
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// DEVICES TABLE
+// ═══════════════════════════════════════════════════
+function filterDevices() { renderDevices(); }
+
+function renderDevices() {
+  const tbody = document.getElementById('device-tbody');
+  const search = (document.getElementById('device-search').value||'').toLowerCase();
+  const filter = document.getElementById('device-filter').value;
+  let devs = [...DEVICES];
+  if (filter!=='all') devs = devs.filter(d=>d.status===filter);
+  if (search) devs = devs.filter(d=>
+    (d.ip||'').includes(search)||(d.hostname||'').toLowerCase().includes(search)||
+    (d.mac||'').includes(search)||(d.vendor||'').toLowerCase().includes(search));
+  if (!devs.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="text-center py-16 text-outline">
+      <span class="material-symbols-outlined text-4xl block mb-2 opacity-30">search_off</span>
+      ${DEVICES.length?'Sin resultados para el filtro':'Haz clic en Escanear para descubrir dispositivos'}
+    </td></tr>`; return;
+  }
+  tbody.innerHTML = devs.map(d=>{
+    const chip = d.status==='online'?'chip-online':d.status==='warning'?'chip-warning':'chip-offline';
+    const gw = d.is_gateway?'<span class="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded-full ml-1">GW</span>':'';
+    return `<tr class="border-b border-outline-variant/10 hover:bg-surface-container cursor-pointer transition-colors" onclick="openModal(${d.id})">
+      <td class="px-6 py-4">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-on-surface-variant opacity-60">${dIcon(d.type)}</span>
+          <div>
+            <p class="font-semibold text-sm text-on-surface">${d.hostname||d.ip}${gw}</p>
+            <span class="${chip} text-xs px-2 py-0.5 rounded-full">${d.status}</span>
+          </div>
+        </div>
+      </td>
+      <td class="px-4 py-4 hidden md:table-cell">
+        <p class="font-mono text-sm text-on-surface">${d.ip}</p>
+        <p class="font-mono text-xs text-outline">${d.mac||'—'}</p>
+      </td>
+      <td class="px-4 py-4 hidden lg:table-cell">
+        <p class="text-sm text-on-surface-variant">${d.vendor||'—'}</p>
+        <p class="text-xs text-outline">${d.type||'—'}</p>
+      </td>
+      <td class="px-4 py-4 text-right font-mono text-sm font-bold ${latColor(d.latency)}">${fLat(d.latency)}</td>
+      <td class="px-4 py-4 text-right font-mono text-sm text-on-surface-variant hidden sm:table-cell">${fJit(d.jitter)}</td>
+      <td class="px-4 py-4 text-right font-mono text-sm ${d.loss>1?'text-error':'text-on-surface-variant'} hidden sm:table-cell">${fLoss(d.loss)}</td>
+      <td class="px-6 py-4 text-right font-mono text-sm font-bold ${qosColor(d.qos)}">${fQos(d.qos)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// DEVICE MODAL
+// ═══════════════════════════════════════════════════
+function openModal(id) {
+  const d = DEVICES.find(x=>x.id===id); if(!d) return;
+  document.getElementById('modal-icon').textContent = dIcon(d.type);
+  document.getElementById('modal-name').textContent = d.hostname||d.ip;
+  document.getElementById('modal-vendor').textContent = d.vendor||'Fabricante desconocido';
+  document.getElementById('modal-ip').textContent = d.ip;
+  document.getElementById('modal-mac').textContent = d.mac||'—';
+  document.getElementById('modal-latency').textContent = fLat(d.latency);
+  document.getElementById('modal-jitter').textContent = fJit(d.jitter);
+  document.getElementById('modal-loss').textContent = fLoss(d.loss);
+  const qEl = document.getElementById('modal-qos');
+  qEl.textContent = fQos(d.qos); qEl.className = 'font-bold text-2xl '+qosColor(d.qos);
+  document.getElementById('modal-ports').textContent = (d.open_ports&&d.open_ports.length)?d.open_ports.join(', '):'Ninguno detectado';
+
+  fetch(`/api/metrics/?device_id=${id}&minutes=15`).then(r=>r.json()).then(data=>{
+    const m = data.metrics[id];
+    const hist = m?m.history.map(h=>h.latency).filter(v=>v!=null):[];
+    if (modalChart) modalChart.destroy();
+    modalChart = new Chart(document.getElementById('modal-chart').getContext('2d'),{
+      type:'line',
+      data:{labels:hist.map(()=>''),datasets:[{data:hist,borderColor:'#a2c9ff',backgroundColor:'rgba(162,201,255,.08)',borderWidth:2,pointRadius:0,tension:.4,fill:true}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+        scales:{x:{display:false},y:{grid:{color:'#32353c'},ticks:{color:'#8c919d',font:{size:10},callback:v=>v+'ms'}}}}
+    });
+  });
+  document.getElementById('device-modal').classList.add('active');
+}
+
+function closeModal() { document.getElementById('device-modal').classList.remove('active'); }
+document.getElementById('device-modal').addEventListener('click',e=>{
+  if(e.target===document.getElementById('device-modal')) closeModal();
+});
+
+// ═══════════════════════════════════════════════════
+// OVERVIEW CHART
+// ═══════════════════════════════════════════════════
+function initOverviewChart() {
+  if (overviewChart) return;
+  const ctx = document.getElementById('overview-chart'); if(!ctx) return;
+  overviewChart = new Chart(ctx.getContext('2d'),{
+    type:'line',
+    data:{labels:Array(60).fill(''),datasets:[{data:globalHistory,borderColor:'#a2c9ff',backgroundColor:'rgba(162,201,255,.05)',borderWidth:2,pointRadius:0,tension:.4,fill:true}]},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+      scales:{x:{display:false},y:{min:0,grid:{color:'#1d2027'},ticks:{color:'#8c919d',font:{size:10},callback:v=>v+'ms'}}}}
+  });
+}
+
+function updateOverviewChart() {
+  if (!overviewChart) return;
+  overviewChart.data.datasets[0].data = [...globalHistory];
+  overviewChart.update('none');
+}
+
+// ═══════════════════════════════════════════════════
+// METRICS CHARTS
+// ═══════════════════════════════════════════════════
+function renderMetrics() {
+  const onlineDevs = DEVICES.filter(d=>d.status!=='offline');
+  const btns = document.getElementById('metric-device-btns');
+  btns.innerHTML = `<button onclick="selectMetricDevice(null)" id="mb-all"
+    class="text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full bg-primary/20 text-primary border border-primary/30 transition-all">
+    Todos</button>` + onlineDevs.map(d=>`
+    <button onclick="selectMetricDevice(${d.id})" id="mb-${d.id}"
+      class="text-xs font-bold uppercase tracking-wider px-4 py-1.5 rounded-full bg-surface-container-high text-on-surface-variant border border-outline-variant/20 hover:text-primary transition-all">
+      ${d.hostname||d.ip}</button>`).join('');
+  loadMetricCharts();
+  renderMetricsTable();
+}
+
+function selectMetricDevice(id) {
+  currentMetricDevice = id;
+  document.querySelectorAll('[id^="mb-"]').forEach(b=>{
+    b.classList.remove('bg-primary/20','text-primary','border-primary/30');
+    b.classList.add('bg-surface-container-high','text-on-surface-variant','border-outline-variant/20');
+  });
+  const active = id?`mb-${id}`:'mb-all';
+  const btn = document.getElementById(active);
+  if(btn){btn.classList.add('bg-primary/20','text-primary','border-primary/30');btn.classList.remove('bg-surface-container-high','text-on-surface-variant','border-outline-variant/20');}
+  loadMetricCharts();
+}
+
+function loadMetricCharts() {
+  const url = currentMetricDevice?`/api/metrics/?device_id=${currentMetricDevice}&minutes=30`:'/api/metrics/?minutes=30';
+  fetch(url).then(r=>r.json()).then(data=>buildMetricCharts(data.metrics||{}));
+}
+
+function buildMetricCharts(metrics) {
+  const keys = Object.keys(metrics); if(!keys.length) return;
+  let labels=[], latD=[], jitD=[], lossD=[], qosD=[];
+  if (currentMetricDevice && metrics[currentMetricDevice]) {
+    const m = metrics[currentMetricDevice];
+    labels = m.history.map(h=>new Date(h.ts).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit',second:'2-digit'}));
+    latD = m.history.map(h=>h.latency);
+    jitD = m.history.map(h=>h.jitter);
+    lossD = m.history.map(h=>h.loss);
+    qosD = m.history.map(h=>h.qos);
+  } else {
+    // Promedio de todos
+    const first = metrics[keys[0]];
+    labels = first.history.map(h=>new Date(h.ts).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'}));
+    const len = labels.length;
+    latD = Array(len).fill(0); jitD = Array(len).fill(0); lossD = Array(len).fill(0); qosD = Array(len).fill(0);
+    let cnt = 0;
+    for(const k of keys){
+      const m=metrics[k]; if(!m||!m.history.length)continue; cnt++;
+      m.history.slice(0,len).forEach((h,i)=>{latD[i]+=(h.latency||0);jitD[i]+=(h.jitter||0);lossD[i]+=(h.loss||0);qosD[i]+=(h.qos||0);});
+    }
+    if(cnt>0){latD=latD.map(v=>+(v/cnt).toFixed(2));jitD=jitD.map(v=>+(v/cnt).toFixed(2));lossD=lossD.map(v=>+(v/cnt).toFixed(2));qosD=qosD.map(v=>+(v/cnt).toFixed(2));}
+  }
+  const mk=(id,data,color,ylabel)=>{
+    const ctx=document.getElementById(id); if(!ctx)return;
+    if(window['_c_'+id]) window['_c_'+id].destroy();
+    window['_c_'+id]=new Chart(ctx.getContext('2d'),{type:'line',
+      data:{labels,datasets:[{data,borderColor:color,backgroundColor:color+'18',borderWidth:2,pointRadius:0,tension:.4,fill:true}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+        scales:{x:{display:false},y:{min:0,grid:{color:'#1d2027'},ticks:{color:'#8c919d',font:{size:10},callback:v=>v+ylabel}}}}});
+  };
+  mk('chart-latency',latD,'#a2c9ff','ms');
+  mk('chart-jitter',jitD,'#ffb68c','ms');
+  mk('chart-loss',lossD,'#ffb4ab','%');
+  mk('chart-qos',qosD,'#4ade80','%');
+}
+
+function renderMetricsTable() {
+  const tbody = document.getElementById('metrics-tbody');
+  const devs = DEVICES.filter(d=>d.status!=='offline');
+  if(!devs.length){tbody.innerHTML='<tr><td colspan="5" class="text-center py-8 text-outline text-sm">Sin dispositivos online</td></tr>';return;}
+  tbody.innerHTML = devs.map(d=>`
+    <tr class="border-b border-outline-variant/10">
+      <td class="px-6 py-3">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-sm text-on-surface-variant opacity-60">${dIcon(d.type)}</span>
+          <div><p class="text-sm font-semibold text-on-surface">${d.hostname||d.ip}</p>
+          <p class="text-xs text-outline font-mono">${d.ip}</p></div>
+        </div>
+      </td>
+      <td class="px-4 py-3 text-right font-mono text-sm ${latColor(d.latency)}">${fLat(d.latency)}</td>
+      <td class="px-4 py-3 text-right font-mono text-sm text-on-surface-variant">${fJit(d.jitter)}</td>
+      <td class="px-4 py-3 text-right font-mono text-sm ${d.loss>1?'text-error':'text-on-surface-variant'}">${fLoss(d.loss)}</td>
+      <td class="px-6 py-3 text-right font-mono text-sm font-bold ${qosColor(d.qos)}">${fQos(d.qos)}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// TOPOLOGY
+// ═══════════════════════════════════════════════════
+function refreshTopology() { fetchTopology(); }
+
+function renderTopology() {
+  const container = document.getElementById('topology-container');
+  if (!TOPOLOGY||!TOPOLOGY.nodes||!TOPOLOGY.nodes.length) {
+    container.innerHTML='<div class="flex flex-col items-center justify-center h-full text-outline gap-3"><span class="material-symbols-outlined text-5xl opacity-30">account_tree</span><p>Sin datos de topología — ejecuta un escaneo primero</p></div>';
+    return;
+  }
+  const nodes = TOPOLOGY.nodes.map(n=>{
+    const sc = n.status==='online'?'#4ade80':n.status==='warning'?'#ffb68c':n.status==='offline'?'#ffb4ab':'#a2c9ff';
+    const bg = n.type==='router'?'#0d2f4d':n.id==='server'?'#1e3048':'#1d2027';
+    return {
+      id:n.id, label:(n.label||n.ip)+'\n'+(n.ip||''),
+      title:`IP: ${n.ip||'—'}\nTipo: ${n.type||'—'}\nVendor: ${n.vendor||'—'}\nEstado: ${n.status||'—'}`,
+      color:{background:bg,border:sc,highlight:{background:'#363941',border:'#a2c9ff'}},
+      font:{color:'#e0e2ec',size:11},
+      borderWidth:n.type==='router'?3:2,
+      size:n.type==='router'?36:n.id==='server'?28:22,
+      shape:'dot',
+      shadow:{enabled:true,color:sc+'44',size:10},
+      _data:n,
+    };
+  });
+  const edges = TOPOLOGY.edges.map((e,i)=>({
+    id:i,from:e.from,to:e.to,
+    color:{color:'#424752',highlight:'#a2c9ff'},
+    width:1.5,smooth:{type:'continuous'},
+  }));
+  const options = {
+    physics:{enabled:true,forceAtlas2Based:{gravitationalConstant:-80,centralGravity:.01,springLength:130,springConstant:.08},solver:'forceAtlas2Based',stabilization:{iterations:150}},
+    interaction:{hover:true,navigationButtons:false},
+  };
+  if(topoNetwork) topoNetwork.destroy();
+  topoNetwork = new vis.Network(container,{nodes:new vis.DataSet(nodes),edges:new vis.DataSet(edges)},options);
+  topoNetwork.on('click',params=>{
+    if(!params.nodes.length){document.getElementById('topo-info').classList.add('hidden');return;}
+    const node = TOPOLOGY.nodes.find(n=>n.id===params.nodes[0]); if(!node)return;
+    const dev = DEVICES.find(d=>d.ip===node.ip);
+    const panel = document.getElementById('topo-info'); panel.classList.remove('hidden');
+    document.getElementById('topo-icon').textContent = dIcon(node.type);
+    document.getElementById('topo-name').textContent = node.label||node.ip;
+    document.getElementById('topo-detail').textContent = `IP: ${node.ip||'—'} · MAC: ${node.mac||'—'} · Vendor: ${node.vendor||'—'}`;
+    document.getElementById('topo-lat').textContent = dev&&dev.latency?dev.latency.toFixed(0)+'ms':'—';
+    document.getElementById('topo-jitter').textContent = dev&&dev.jitter?dev.jitter.toFixed(1)+'ms':'—';
+    document.getElementById('topo-qos').textContent = dev&&dev.qos?dev.qos.toFixed(0)+'%':'—';
+    const stEl = document.getElementById('topo-status');
+    const st = node.status||(node.type==='router'?'online':'—');
+    stEl.textContent = st;
+    stEl.className = 'font-bold '+(st==='online'?'text-primary':st==='warning'?'text-tertiary':st==='offline'?'text-error':'text-on-surface');
+  });
+}
+
+function fitTopology() { if(topoNetwork) topoNetwork.fit({animation:{duration:600,easingFunction:'easeInOutQuad'}}); }
+
+// ═══════════════════════════════════════════════════
+// REPORTS
+// ═══════════════════════════════════════════════════
+function renderReports() {
+  const container = document.getElementById('reports-list');
+  if(!REPORTS.length){
+    container.innerHTML='<div class="text-center py-12 text-outline text-sm"><span class="material-symbols-outlined text-4xl block mb-2 opacity-30">history</span>Sin escaneos registrados</div>';
+    return;
+  }
+  container.innerHTML = REPORTS.map(r=>{
+    const ts = new Date(r.timestamp).toLocaleString('es',{dateStyle:'medium',timeStyle:'short'});
+    return `<div class="px-6 py-5 border-b border-outline-variant/10 last:border-0">
+      <div class="flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-primary opacity-70">wifi_find</span>
+          <div>
+            <p class="font-semibold text-sm text-on-surface">${r.network}</p>
+            <p class="text-xs text-outline">${ts} · Duración: ${r.scan_duration}s</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-6 text-center">
+          <div><p class="text-xs text-outline">Dispositivos</p><p class="font-bold text-on-surface">${r.total_found}</p></div>
+          <div><p class="text-xs text-outline">Online</p><p class="font-bold text-primary">${r.online_count}</p></div>
+          <div><p class="text-xs text-outline">Lat. Prom.</p><p class="font-bold text-on-surface">${r.avg_latency?r.avg_latency+'ms':'—'}</p></div>
+          <div><p class="text-xs text-outline">QoS</p><p class="font-bold ${qosColor(r.avg_qos)}">${r.avg_qos?r.avg_qos+'%':'—'}</p></div>
+          <button onclick="window.open('/api/export/${r.id}/')" class="flex items-center gap-1 text-xs text-on-surface-variant hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-surface-container">
+            <span class="material-symbols-outlined text-sm">download</span>JSON
+          </button>
+        </div>
+      </div>
+      ${r.devices&&r.devices.length?`
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full text-xs">
+          <thead><tr class="text-outline border-b border-outline-variant/10">
+            <th class="text-left py-2">IP</th><th class="text-left py-2">Hostname</th>
+            <th class="text-left py-2 hidden md:table-cell">MAC</th>
+            <th class="text-left py-2 hidden lg:table-cell">Fabricante</th>
+            <th class="text-left py-2">Tipo</th>
+            <th class="text-right py-2">Estado</th>
+            <th class="text-right py-2">Latencia</th>
+            <th class="text-right py-2">Jitter</th>
+            <th class="text-right py-2">Loss</th>
+            <th class="text-right py-2">QoS</th>
+          </tr></thead>
+          <tbody>${r.devices.map(d=>{
+            const sc=d.status==='online'?'chip-online':d.status==='warning'?'chip-warning':'chip-offline';
+            return `<tr class="border-b border-outline-variant/10">
+              <td class="py-2 font-mono text-on-surface">${d.ip}</td>
+              <td class="py-2 text-on-surface-variant">${d.hostname||'—'}</td>
+              <td class="py-2 font-mono text-outline hidden md:table-cell">${d.mac||'—'}</td>
+              <td class="py-2 text-outline hidden lg:table-cell">${d.vendor||'—'}</td>
+              <td class="py-2 text-outline">${d.type||'—'}</td>
+              <td class="py-2 text-right"><span class="${sc} px-1.5 py-0.5 rounded-full">${d.status}</span></td>
+              <td class="py-2 text-right font-mono ${latColor(d.latency)}">${fLat(d.latency)}</td>
+              <td class="py-2 text-right font-mono text-on-surface-variant">${fJit(d.jitter)}</td>
+              <td class="py-2 text-right font-mono ${d.loss>1?'text-error':'text-on-surface-variant'}">${fLoss(d.loss)}</td>
+              <td class="py-2 text-right font-mono font-bold ${qosColor(d.qos)}">${fQos(d.qos)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function renderReportDevices() {
+  const tbody = document.getElementById('report-devices-tbody');
+  const badge = document.getElementById('report-device-count');
+  badge.textContent = DEVICES.length+' dispositivos';
+  if(!DEVICES.length){tbody.innerHTML='<tr><td colspan="10" class="text-center py-8 text-outline text-sm">Sin datos — ejecuta un escaneo</td></tr>';return;}
+  const sorted = [...DEVICES].sort((a,b)=>{
+    const pa=a.ip.split('.').map(Number),pb=b.ip.split('.').map(Number);
+    for(let i=0;i<4;i++) if(pa[i]!==pb[i]) return pa[i]-pb[i]; return 0;
+  });
+  tbody.innerHTML = sorted.map(d=>{
+    const sc=d.status==='online'?'chip-online':d.status==='warning'?'chip-warning':'chip-offline';
+    const gw=d.is_gateway?' 🌐':'';
+    return `<tr class="border-b border-outline-variant/10 hover:bg-surface-container/30 transition-colors">
+      <td class="py-2.5 font-mono text-sm text-on-surface">${d.ip}</td>
+      <td class="py-2.5 text-sm text-on-surface-variant">${d.hostname||d.ip}${gw}</td>
+      <td class="py-2.5 font-mono text-xs text-outline hidden md:table-cell">${d.mac||'—'}</td>
+      <td class="py-2.5 text-xs text-outline hidden lg:table-cell">${d.vendor||'—'}</td>
+      <td class="py-2.5 text-xs text-on-surface-variant">${d.type||'—'}</td>
+      <td class="py-2.5 text-right"><span class="${sc} text-xs px-1.5 py-0.5 rounded-full">${d.status}</span></td>
+      <td class="py-2.5 text-right font-mono text-sm ${latColor(d.latency)}">${fLat(d.latency)}</td>
+      <td class="py-2.5 text-right font-mono text-sm text-on-surface-variant">${fJit(d.jitter)}</td>
+      <td class="py-2.5 text-right font-mono text-sm ${d.loss>1?'text-error':'text-on-surface-variant'}">${fLoss(d.loss)}</td>
+      <td class="py-2.5 text-right font-mono text-sm font-bold ${qosColor(d.qos)}">${fQos(d.qos)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════════════
+function updateThreshold(t,v){
+  if(t==='latency'){document.getElementById('lbl-latency').textContent=v+'ms';}
+  if(t==='loss'){document.getElementById('lbl-loss').textContent=parseFloat(v).toFixed(1)+'%';}
+  if(t==='jitter'){document.getElementById('lbl-jitter').textContent=v+'ms';}
+}
+function loadNetworkInfo(){
+  fetch('/api/network/').then(r=>r.json()).then(data=>{
+    const panel=document.getElementById('network-info-panel');
+    const ifaces=data.interfaces||[];
+    if(!ifaces.length){panel.innerHTML='<p class="text-sm text-outline">Sin interfaces detectadas</p>';return;}
+    panel.innerHTML=ifaces.map(i=>`
+      <div class="bg-surface-container p-4 rounded-xl mb-3">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-lg">lan</span>
+            <span class="font-mono font-bold text-sm text-on-surface">${i.name}</span>
+          </div>
+          <span class="chip-online text-xs px-2 py-0.5 rounded-full">activa</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div><span class="text-outline">IP:</span> <span class="font-mono text-on-surface">${i.ip}</span></div>
+          <div><span class="text-outline">Máscara:</span> <span class="font-mono text-on-surface">${i.netmask}</span></div>
+          <div><span class="text-outline">Red:</span> <span class="font-mono text-on-surface">${i.network}</span></div>
+          <div><span class="text-outline">Gateway:</span> <span class="font-mono text-on-surface">${i.gateway||'—'}</span></div>
+        </div>
+      </div>`).join('');
+    if(ifaces[0]) document.getElementById('sidebar-network').textContent=ifaces[0].network;
+  }).catch(()=>{});
+}
+function exportAllDevices(){window.open('/api/export/','_blank');}
+
+// ═══════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════
+setInterval(()=>{document.getElementById('live-clock').textContent=new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},1000);
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+navigate('overview');
+setTimeout(initOverviewChart, 100);
+startPolling();          // Inicia polling HTTP cada 8s (sin WebSocket)
+loadNetworkInfo();       // Carga info de red para sidebar
+</script>
+</body>
+</html>

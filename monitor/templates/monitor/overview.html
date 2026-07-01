@@ -1,0 +1,334 @@
+{% extends "monitor/base.html" %}
+{% load static %}
+
+{% block title %}Vista General{% endblock %}
+{% block page_title %}Vista General de Red{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Stat cards con borde animado */
+.stat-card {
+  background: rgba(12, 20, 34, 0.85);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+  transition: border-color .25s, box-shadow .25s, transform .2s;
+  cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--accent-color, linear-gradient(90deg, var(--primary), var(--blue)));
+  opacity: 0;
+  transition: opacity .25s;
+}
+.stat-card:hover {
+  border-color: rgba(0,212,255,0.25);
+  box-shadow: 0 0 40px rgba(0,212,255,0.07);
+  transform: translateY(-2px);
+}
+.stat-card:hover::after { opacity: 1; }
+
+/* Icono flotante */
+.stat-icon {
+  width: 40px; height: 40px;
+  border-radius: .625rem;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 1rem;
+  font-size: 1.3rem;
+}
+
+/* Animación de conteo */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.count-anim { animation: countUp .4s ease; }
+
+/* Panel QoS gauge */
+.qos-panel {
+  background: rgba(12,20,34,0.85);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Alertas panel */
+.alerts-panel {
+  background: rgba(12,20,34,0.85);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Gráfico global */
+.chart-panel {
+  background: rgba(12,20,34,0.85);
+  border: 1px solid rgba(0,212,255,0.1);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  backdrop-filter: blur(12px);
+}
+
+/* Pequeños stats bajo gauge */
+.mini-stat { text-align: center; }
+.mini-stat .val {
+  font-weight: 700;
+  font-size: .95rem;
+  font-family: var(--font-mono);
+  color: var(--on-surface);
+}
+.mini-stat .lbl {
+  font-size: .6rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--on-surface-3);
+  margin-top: 2px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 style="font-size:1.5rem">Vista General</h2>
+    <p>Salud de la red en tiempo real — dispositivos detectados en tu red local.</p>
+  </div>
+</div>
+
+<!-- STAT CARDS -->
+<div class="grid-3" style="margin-bottom:1.25rem">
+
+  <div class="stat-card" style="--accent-color:linear-gradient(90deg,var(--primary),var(--blue))">
+    <div class="stat-icon" style="background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.15)">
+      <span class="material-symbols-outlined" style="color:var(--primary)">devices</span>
+    </div>
+    <div class="label" style="margin-bottom:.5rem">Total Dispositivos</div>
+    <div class="stat-value glow-val" id="stat-total">—</div>
+    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-network">Ejecuta un escaneo</div>
+  </div>
+
+  <div class="stat-card" style="--accent-color:linear-gradient(90deg,var(--green),#00a855)">
+    <div class="stat-icon" style="background:rgba(0,230,118,0.08);border:1px solid rgba(0,230,118,0.15)">
+      <span class="material-symbols-outlined" style="color:var(--green)">wifi</span>
+    </div>
+    <div class="label" style="margin-bottom:.5rem">Conectados Ahora</div>
+    <div class="stat-value" style="color:var(--green);text-shadow:0 0 20px rgba(0,230,118,0.4)" id="stat-online">—</div>
+    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-online-pct">— nodos activos</div>
+  </div>
+
+  <div class="stat-card" style="--accent-color:linear-gradient(90deg,var(--blue),var(--purple))">
+    <div class="stat-icon" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15)">
+      <span class="material-symbols-outlined" style="color:#a78bfa">speed</span>
+    </div>
+    <div class="label" style="margin-bottom:.5rem">Puntaje QoS Promedio</div>
+    <div class="stat-value gradient-text" id="stat-qos">—</div>
+    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-qos-label">Calculando...</div>
+  </div>
+
+</div>
+
+<!-- GAUGE + ALERTAS -->
+<div class="gauge-alerts-grid" style="display:grid;grid-template-columns:1fr 2fr;gap:1.25rem;margin-bottom:1.25rem">
+
+  <div class="qos-panel">
+    <div class="card-title" style="align-self:flex-start;margin-bottom:1rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">network_check</span>
+      Salud de Red
+    </div>
+    <div class="gauge-wrap" style="position:relative;width:160px;height:160px;margin:0 auto">
+      <svg viewBox="0 0 160 160" style="width:100%;height:100%;transform:rotate(-90deg)">
+        <circle cx="80" cy="80" r="62" fill="none" stroke="rgba(0,212,255,0.06)" stroke-width="14"/>
+        <circle id="gauge-circle" cx="80" cy="80" r="62" fill="none"
+          stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+          stroke-dasharray="389.6" stroke-dashoffset="389.6"
+          style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"/>
+        <defs>
+          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%"   stop-color="#00d4ff"/>
+            <stop offset="50%"  stop-color="#0080ff"/>
+            <stop offset="100%" stop-color="#7c3aed"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+        <span class="gauge-value" id="gauge-val">—</span>
+        <span class="gauge-label" id="gauge-label">CARGANDO</span>
+      </div>
+      <!-- Halo externo -->
+      <div style="position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(0,212,255,0.07);pointer-events:none"></div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-top:1.25rem;width:100%">
+      <div class="mini-stat">
+        <div class="lbl">Latencia</div>
+        <div class="val" id="avg-latency">—</div>
+      </div>
+      <div class="mini-stat">
+        <div class="lbl">Jitter</div>
+        <div class="val" id="avg-jitter">—</div>
+      </div>
+      <div class="mini-stat">
+        <div class="lbl">Pérdida</div>
+        <div class="val" id="avg-loss">—</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="alerts-panel">
+    <div class="card-title" style="justify-content:space-between;margin-bottom:1rem">
+      <span style="display:flex;align-items:center;gap:.5rem">
+        <span class="material-symbols-outlined" style="font-size:1rem;color:var(--amber)">notifications_active</span>
+        Alertas Activas
+      </span>
+      <span id="alert-badge"
+        style="display:none;background:rgba(255,51,102,0.12);color:var(--red);border:1px solid rgba(255,51,102,0.25);font-size:.68rem;padding:2px 10px;border-radius:999px;font-weight:700;font-family:var(--font-mono)"></span>
+    </div>
+    <div id="alerts-list"
+      style="display:flex;flex-direction:column;gap:.5rem;max-height:240px;overflow-y:auto;flex:1">
+      <div style="text-align:center;padding:3rem 0;color:var(--on-surface-3)">
+        <span class="material-symbols-outlined"
+          style="display:block;font-size:2.5rem;opacity:.2;margin-bottom:.5rem">notifications_off</span>
+        <span style="font-size:.8rem">Sin alertas activas</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- GRÁFICO GLOBAL -->
+<div class="chart-panel">
+  <div class="card-title" style="justify-content:space-between;margin-bottom:1rem">
+    <span style="display:flex;align-items:center;gap:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">show_chart</span>
+      Latencia Promedio Global
+    </span>
+    <span id="global-avg-display"
+      style="font-family:var(--font-mono);color:var(--primary);font-weight:700;font-size:.9rem;
+        text-shadow:0 0 12px rgba(0,212,255,0.4)">—</span>
+  </div>
+  <div class="chart-wrap"><canvas id="overview-chart"></canvas></div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let globalHistory = Array(60).fill(null);
+let overviewChart = null;
+
+function initOverviewChart() {
+  overviewChart = makeLineChart(
+    'overview-chart',
+    Array(60).fill(''),
+    [chartDataset(globalHistory, '#00d4ff')],
+    'ms'
+  );
+}
+
+document.addEventListener('ajflux:devices', e => {
+  const devs    = e.detail;
+  const total   = devs.length;
+  const online  = devs.filter(d => d.status === 'online').length;
+  const warn    = devs.filter(d => d.status === 'warning').length;
+  const active  = online + warn;
+  const activeD = devs.filter(d => d.latency != null && d.status !== 'offline');
+  const avgQos  = activeD.length ? Math.round(activeD.reduce((s,d) => s + (d.qos||0), 0) / activeD.length) : null;
+  const avgLat  = activeD.length ? activeD.reduce((s,d) => s + (d.latency||0), 0) / activeD.length : null;
+  const avgJit  = activeD.length ? activeD.reduce((s,d) => s + (d.jitter||0), 0) / activeD.length : null;
+  const avgLoss = activeD.length ? activeD.reduce((s,d) => s + (d.packet_loss||0), 0) / activeD.length : null;
+
+  setAnimVal('stat-total',  total  || '—');
+  setAnimVal('stat-online', active || '—');
+  document.getElementById('stat-online-pct').textContent =
+    total ? `${Math.round(active/total*100)}% nodos activos` : '—';
+  setAnimVal('stat-qos', avgQos != null ? avgQos : '—');
+  document.getElementById('avg-latency').textContent = avgLat  != null ? avgLat.toFixed(0)+'ms'  : '—';
+  document.getElementById('avg-jitter').textContent  = avgJit  != null ? avgJit.toFixed(1)+'ms'  : '—';
+  document.getElementById('avg-loss').textContent    = avgLoss != null ? avgLoss.toFixed(1)+'%'  : '—';
+  document.getElementById('global-avg-display').textContent = avgLat != null ? avgLat.toFixed(0)+'ms' : '—';
+
+  const lbl = !avgQos ? 'CARGANDO' : avgQos>=90?'EXCELENTE':avgQos>=70?'BUENO':avgQos>=50?'REGULAR':'CRÍTICO';
+  document.getElementById('stat-qos-label').textContent = avgQos != null ? lbl : 'Calculando...';
+  document.getElementById('gauge-label').textContent    = lbl;
+  document.getElementById('gauge-val').textContent      = avgQos != null ? avgQos : '—';
+
+  if (avgQos != null) {
+    document.getElementById('gauge-circle').setAttribute('stroke-dashoffset', 389.6 - 389.6 * avgQos / 100);
+  }
+  if (avgLat != null) {
+    globalHistory.push(+avgLat.toFixed(1)); globalHistory.shift();
+    if (overviewChart) { overviewChart.data.datasets[0].data = [...globalHistory]; overviewChart.update('none'); }
+  }
+});
+
+function setAnimVal(id, val) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = val;
+  el.classList.remove('count-anim');
+  void el.offsetWidth;
+  el.classList.add('count-anim');
+}
+
+document.addEventListener('ajflux:alerts', e => {
+  const alerts = e.detail;
+  const list   = document.getElementById('alerts-list');
+  const badge  = document.getElementById('alert-badge');
+
+  if (!alerts.length) {
+    list.innerHTML = `<div style="text-align:center;padding:3rem 0;color:var(--on-surface-3)">
+      <span class="material-symbols-outlined" style="display:block;font-size:2.5rem;opacity:.2;margin-bottom:.5rem">notifications_off</span>
+      <span style="font-size:.8rem">Sin alertas activas</span>
+    </div>`;
+    badge.style.display = 'none';
+    return;
+  }
+
+  badge.textContent = alerts.length;
+  badge.style.display = 'inline';
+
+  const icons  = { critical:'error', warning:'warning', info:'info' };
+  const colors = { critical:'var(--red)', warning:'var(--amber)', info:'var(--primary)' };
+
+  list.innerHTML = alerts.slice(0, 8).map(a => `
+    <div class="alert-item alert-${a.level} slide-in">
+      <span class="material-symbols-outlined" style="color:${colors[a.level]||'var(--primary)'};font-size:1.1rem;flex-shrink:0">${icons[a.level]||'info'}</span>
+      <div style="flex:1;min-width:0">
+        <div class="alert-msg">${a.message}</div>
+        <div class="alert-meta">${a.device_ip||''} · ${new Date(a.timestamp).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</div>
+      </div>
+      <button onclick="resolveAlert(${a.id})"
+        style="background:none;border:none;cursor:pointer;color:var(--on-surface-3);display:flex;padding:3px;border-radius:4px;transition:all .15s"
+        onmouseover="this.style.color='var(--red)';this.style.background='rgba(255,51,102,0.1)'"
+        onmouseout="this.style.color='var(--on-surface-3)';this.style.background='none'">
+        <span class="material-symbols-outlined" style="font-size:1rem">close</span>
+      </button>
+    </div>`).join('');
+});
+
+function resolveAlert(id) {
+  fetch(`/api/alertas/${id}/resolver/`, { method: 'POST' })
+    .then(() => {
+      window.AJFLUX.alerts = window.AJFLUX.alerts.filter(a => a.id !== id);
+      document.dispatchEvent(new CustomEvent('ajflux:alerts', { detail: window.AJFLUX.alerts }));
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initOverviewChart);
+</script>
+{% endblock %}

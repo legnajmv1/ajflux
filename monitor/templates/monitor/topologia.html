@@ -1,0 +1,536 @@
+{% extends "monitor/base.html" %}
+{% load static %}
+
+{% block title %}Topología{% endblock %}
+{% block page_title %}Topología de Red{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Badge de tipo de topología */
+.topo-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 1.25rem;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: .84rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  border: 1px solid;
+}
+.topo-estrella   { background:rgba(0,212,255,.1);   color:#00d4ff;  border-color:rgba(0,212,255,.3);  }
+.topo-arbol      { background:rgba(0,230,118,.1);   color:#00e676;  border-color:rgba(0,230,118,.3);  }
+.topo-malla      { background:rgba(255,171,0,.1);   color:#ffab00;  border-color:rgba(255,171,0,.3);  }
+.topo-hibrida    { background:rgba(124,58,237,.1);  color:#a78bfa;  border-color:rgba(124,58,237,.3); }
+.topo-lineal     { background:rgba(255,51,102,.1);  color:#ff6680;  border-color:rgba(255,51,102,.3); }
+.topo-desconocida{ background:rgba(100,120,140,.1); color:#8aa0b8;  border-color:rgba(100,120,140,.3);}
+
+/* Barra de confianza */
+.confidence-bar  { height: 5px; background:var(--bg-3); border-radius:3px; overflow:hidden; margin-top:.5rem; }
+.confidence-fill { height:100%; border-radius:3px; transition:width 1.2s cubic-bezier(.4,0,.2,1); }
+
+/* Panel de análisis */
+.analysis-panel {
+  background: rgba(10,18,30,0.9);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.25rem 1.5rem;
+  backdrop-filter: blur(12px);
+  margin-bottom: 1.25rem;
+}
+
+/* Evidencia */
+.evidence-item {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .8rem; color: var(--on-surface-2);
+  padding: .375rem 0;
+  border-bottom: 1px solid rgba(0,212,255,.04);
+}
+.evidence-item:last-child { border-bottom: none; }
+.evidence-item .material-symbols-outlined { font-size: .9rem; color: var(--primary); opacity:.7; }
+
+/* Referencia de topologías */
+.topo-ref-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: .625rem;
+  margin-top: 1rem;
+}
+.topo-ref-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .75rem;
+  transition: all .25s;
+}
+.topo-ref-card.active {
+  box-shadow: 0 0 20px rgba(0,212,255,.1);
+}
+
+/* Contenedor mapa */
+#topology-container {
+  background: rgba(6,12,20,0.95) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--r-lg) !important;
+  height: 560px;
+  min-height: 380px;
+}
+
+/* Leyenda */
+.topo-leyenda {
+  display: flex; flex-wrap: wrap; gap: .875rem;
+  margin-bottom: 1rem;
+}
+.topo-leyenda span {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .72rem; color: var(--on-surface-2);
+}
+.topo-dot-lg {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+}
+
+/* Panel info clic */
+.topo-info-panel {
+  margin-top: 1rem;
+  background: rgba(10,18,30,0.9);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.25rem 1.5rem;
+  display: none;
+  backdrop-filter: blur(12px);
+  animation: fadeIn .25s ease;
+}
+.topo-info-panel.visible { display: block; }
+
+.topo-info-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  text-align: center;
+  margin-top: 1rem;
+}
+.topo-info-item .topo-info-label {
+  font-size: .6rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--on-surface-3);
+}
+.topo-info-item .topo-info-val {
+  font-weight:700; color:var(--on-surface); font-size:.9rem;
+  font-family: var(--font-mono); margin-top:2px;
+}
+
+@keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+.spin-anim { animation: spin 1.5s linear infinite; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 style="font-size:1.5rem">Topología de Red</h2>
+    <p>Mapa visual interactivo y detección automática del tipo de topología.</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-secondary" onclick="analyzeTopology()">
+      <span class="material-symbols-outlined">analytics</span>Analizar
+    </button>
+    <button class="btn btn-secondary" onclick="refreshTopology()">
+      <span class="material-symbols-outlined">refresh</span>Actualizar
+    </button>
+    <button class="btn btn-secondary" onclick="fitTopology()">
+      <span class="material-symbols-outlined">fit_screen</span>Ajustar
+    </button>
+  </div>
+</div>
+
+<!-- PANEL ANÁLISIS DE TOPOLOGÍA -->
+<div class="analysis-panel" id="topo-analysis-card">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1rem">
+    <div>
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.625rem;display:flex;align-items:center;gap:.375rem">
+        <span class="material-symbols-outlined" style="font-size:.9rem">hub</span>
+        Tipo de Topología Detectada
+      </div>
+      <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+        <span id="topo-type-badge" class="topo-type-badge topo-desconocida">
+          <span class="material-symbols-outlined" style="font-size:1rem">help_outline</span>
+          Sin analizar
+        </span>
+        <div>
+          <div style="font-size:.68rem;color:var(--on-surface-3);margin-bottom:.25rem">Confianza del análisis</div>
+          <div style="display:flex;align-items:center;gap:.625rem">
+            <div class="confidence-bar" style="width:160px">
+              <div id="confidence-fill" class="confidence-fill" style="width:0%;background:var(--primary)"></div>
+            </div>
+            <span id="confidence-val"
+              style="font-size:.8rem;font-weight:700;font-family:var(--font-mono);color:var(--on-surface)">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Descripción -->
+  <div id="topo-description"
+    style="padding:.875rem 1rem;background:rgba(0,212,255,.03);border:1px solid var(--border);
+      border-radius:var(--r);font-size:.84rem;color:var(--on-surface-2);display:none;margin-bottom:1rem"></div>
+
+  <!-- Evidencia -->
+  <div id="topo-evidence-wrap" style="display:none;margin-bottom:1rem">
+    <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.5rem">Evidencia recopilada</div>
+    <div id="topo-evidence"></div>
+  </div>
+
+  <!-- Referencia -->
+  <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.5rem">Referencia de topologías</div>
+  <div class="topo-ref-grid" id="topo-reference"></div>
+</div>
+
+<!-- LEYENDA -->
+<div class="topo-leyenda">
+  <span><span class="topo-dot-lg" style="background:#00d4ff;box-shadow:0 0 8px rgba(0,212,255,.5)"></span>Gateway / Router</span>
+  <span><span class="topo-dot-lg" style="background:#00e676;box-shadow:0 0 6px rgba(0,230,118,.4)"></span>En línea</span>
+  <span><span class="topo-dot-lg" style="background:#a78bfa;box-shadow:0 0 6px rgba(167,139,250,.4)"></span>Switch intermediario</span>
+  <span><span class="topo-dot-lg" style="background:#ffab00;box-shadow:0 0 6px rgba(255,171,0,.4)"></span>Con alerta</span>
+  <span><span class="topo-dot-lg" style="background:#ff3366;box-shadow:0 0 6px rgba(255,51,102,.3)"></span>Desconectado</span>
+  <span><span class="topo-dot-lg" style="background:#60a5fa;box-shadow:0 0 6px rgba(96,165,250,.3)"></span>Este servidor</span>
+</div>
+
+<!-- MAPA -->
+<div id="topology-container"></div>
+
+<!-- PANEL INFO AL HACER CLIC -->
+<div class="topo-info-panel" id="topo-info">
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+    <div style="width:44px;height:44px;border-radius:var(--r);background:rgba(0,212,255,.1);border:1px solid var(--border-2);display:flex;align-items:center;justify-content:center">
+      <span id="topo-icon" class="material-symbols-outlined" style="font-size:1.5rem;color:var(--primary)">router</span>
+    </div>
+    <div>
+      <div id="topo-name" style="font-weight:700;font-size:1.05rem;color:var(--on-surface)"></div>
+      <div id="topo-detail" style="font-size:.72rem;color:var(--on-surface-3);font-family:var(--font-mono);margin-top:2px"></div>
+    </div>
+    <div class="topo-info-grid" style="margin-left:auto;margin-top:0">
+      <div class="topo-info-item"><div class="topo-info-label">Latencia</div><div class="topo-info-val" id="topo-lat">—</div></div>
+      <div class="topo-info-item"><div class="topo-info-label">Jitter</div><div class="topo-info-val" id="topo-jitter">—</div></div>
+      <div class="topo-info-item"><div class="topo-info-label">Paq. Perdidos</div><div class="topo-info-val" id="topo-loss">—</div></div>
+      <div class="topo-info-item"><div class="topo-info-label">QoS</div><div class="topo-info-val" id="topo-qos">—</div></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+<script>
+let cy = null;
+
+const TOPO_REFS = [
+  { key:'estrella', nombre:'Estrella',    color:'#00d4ff', icono:'hub',          desc:'Todos conectados a un punto central.' },
+  { key:'arbol',    nombre:'Árbol',       color:'#00e676', icono:'account_tree', desc:'Jerarquía en capas, switches en cascada.' },
+  { key:'malla',    nombre:'Malla',       color:'#ffab00', icono:'grid_view',    desc:'Múltiples rutas, alta redundancia.' },
+  { key:'hibrida',  nombre:'Híbrida',     color:'#a78bfa', icono:'share',        desc:'Combinación de dos o más tipos.' },
+  { key:'lineal',   nombre:'Lineal/Bus',  color:'#ff6680', icono:'linear_scale', desc:'Dispositivos encadenados uno a uno.' },
+];
+
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1,3),16),parseInt(hex.slice(3,5),16),parseInt(hex.slice(5,7),16)].join(',');
+}
+
+function renderTopoReference(activeType) {
+  document.getElementById('topo-reference').innerHTML = TOPO_REFS.map(t => {
+    const isActive = t.key === activeType;
+    return `<div class="topo-ref-card ${isActive ? 'active' : ''}"
+      style="${isActive ? `border-color:${t.color}55;background:rgba(${hexToRgb(t.color)},.06);` : ''}">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem">
+        <span class="material-symbols-outlined"
+          style="font-size:1rem;color:${isActive ? t.color : 'var(--on-surface-3)'}">
+          ${t.icono}
+        </span>
+        <span style="font-weight:700;font-size:.78rem;color:${isActive ? t.color : 'var(--on-surface-2)'}">
+          ${t.nombre}${isActive ? ' ← TU RED' : ''}
+        </span>
+      </div>
+      <p style="font-size:.68rem;color:var(--on-surface-3);margin:0">${t.desc}</p>
+    </div>`;
+  }).join('');
+}
+
+function renderAnalysis(analysis) {
+  if (!analysis) return;
+  const { type, confidence, description, evidence } = analysis;
+  const names = {estrella:'Estrella',arbol:'Árbol',malla:'Malla',hibrida:'Híbrida',lineal:'Lineal / Bus',desconocida:'Desconocida'};
+  const icons = {estrella:'hub',arbol:'account_tree',malla:'grid_view',hibrida:'share',lineal:'linear_scale',desconocida:'help_outline'};
+
+  const badge = document.getElementById('topo-type-badge');
+  badge.className = `topo-type-badge topo-${type}`;
+  badge.innerHTML = `<span class="material-symbols-outlined" style="font-size:1rem">${icons[type]||'help_outline'}</span>${names[type]||type}`;
+
+  const fill      = document.getElementById('confidence-fill');
+  const confColor = confidence>=80?'var(--primary)':confidence>=60?'var(--amber)':'var(--red)';
+  fill.style.width      = confidence + '%';
+  fill.style.background = confColor;
+  const cv = document.getElementById('confidence-val');
+  cv.textContent = confidence + '%';
+  cv.style.color = confColor;
+
+  const desc = document.getElementById('topo-description');
+  desc.textContent   = description;
+  desc.style.display = 'block';
+
+  if (evidence && evidence.length) {
+    document.getElementById('topo-evidence-wrap').style.display = 'block';
+    document.getElementById('topo-evidence').innerHTML = evidence.map(e =>
+      `<div class="evidence-item">
+        <span class="material-symbols-outlined">check_circle</span>${e}
+      </div>`).join('');
+  }
+  renderTopoReference(type);
+}
+
+function analyzeTopology() {
+  const badge = document.getElementById('topo-type-badge');
+  badge.className = 'topo-type-badge topo-desconocida';
+  badge.innerHTML = `<span class="material-symbols-outlined spin-anim" style="font-size:1rem">radar</span>Analizando...`;
+  document.getElementById('topo-description').style.display   = 'none';
+  document.getElementById('topo-evidence-wrap').style.display = 'none';
+  fetch('/api/topologia/analizar/')
+    .then(r => r.json())
+    .then(data => { if (data.analysis) renderAnalysis(data.analysis); })
+    .catch(() => { badge.innerHTML = `<span class="material-symbols-outlined" style="font-size:1rem">error</span>Error al analizar`; });
+}
+
+function refreshTopology() {
+  fetch('/api/topologia/')
+    .then(r => r.json())
+    .then(data => {
+      const topo = data.topology || { nodes:[], edges:[] };
+      window.AJFLUX.topology = topo;
+      renderTopology();
+      if (topo.topology_info) renderAnalysis(topo.topology_info);
+    });
+}
+
+function renderTopology() {
+  const topo      = window.AJFLUX.topology;
+  const container = document.getElementById('topology-container');
+
+  if (!topo || !topo.nodes || !topo.nodes.length) {
+    if (cy) { cy.destroy(); cy = null; }
+    container.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;
+      justify-content:center;height:100%;color:var(--on-surface-3);gap:.875rem">
+      <span class="material-symbols-outlined" style="font-size:4rem;opacity:.1">account_tree</span>
+      <p style="font-size:.84rem">Sin datos de topología — ejecuta un escaneo primero</p>
+    </div>`;
+    return;
+  }
+
+  const elements = [
+    ...topo.nodes.map(n => ({
+      data: {
+        id:     String(n.id),
+        label:  (n.label || n.ip || '').split('\n')[0],
+        type:   n.type   || 'unknown',
+        ip:     n.ip     || '',
+        mac:    n.mac    || '',
+        vendor: n.vendor || '',
+        status: n.status || 'online',
+        _orig_id: n.id,
+      }
+    })),
+    ...topo.edges.map((e, i) => ({
+      data: { id:`e${i}`, source:String(e.from), target:String(e.to) }
+    }))
+  ];
+
+  if (cy) cy.destroy();
+
+  cy = cytoscape({
+    container,
+    elements,
+    style: [
+      // ── Nodo base
+      {
+        selector: 'node',
+        style: {
+          'shape':             'ellipse',
+          'background-color':  '#0a1a10',
+          'border-color':      '#00e676',
+          'border-width':      2,
+          'width':             20,
+          'height':            20,
+          'label':             'data(label)',
+          'color':             '#a0c8e0',
+          'font-size':         9,
+          'font-family':       'monospace',
+          'font-weight':       600,
+          'text-valign':       'bottom',
+          'text-halign':       'center',
+          'text-margin-y':     5,
+          'text-wrap':         'ellipsis',
+          'text-max-width':    80,
+          'min-zoomed-font-size': 6,
+          'shadow-blur':       8,
+          'shadow-color':      '#00e676',
+          'shadow-opacity':    0.45,
+          'shadow-offset-x':   0,
+          'shadow-offset-y':   0,
+        }
+      },
+      // ── Router / Gateway — nodo central
+      {
+        selector: 'node[type = "router"]',
+        style: {
+          'background-color': '#031929',
+          'border-color':     '#00d4ff',
+          'border-width':     3,
+          'width':            34,
+          'height':           34,
+          'font-size':        11,
+          'font-weight':      700,
+          'color':            '#00d4ff',
+          'shadow-color':     '#00d4ff',
+          'shadow-opacity':   0.65,
+          'shadow-blur':      18,
+          'z-index':          3,
+        }
+      },
+      // ── Servidor (este equipo)
+      {
+        selector: '#server',
+        style: {
+          'background-color': '#021525',
+          'border-color':     '#60a5fa',
+          'border-width':     2.5,
+          'width':            28,
+          'height':           28,
+          'font-size':        10,
+          'color':            '#60a5fa',
+          'shadow-color':     '#60a5fa',
+          'shadow-opacity':   0.55,
+          'shadow-blur':      14,
+          'z-index':          2,
+        }
+      },
+      // ── Switch
+      {
+        selector: 'node[type = "switch"]',
+        style: {
+          'background-color': '#110d28',
+          'border-color':     '#a78bfa',
+          'border-width':     2,
+          'width':            24,
+          'height':           24,
+          'color':            '#a78bfa',
+          'shadow-color':     '#a78bfa',
+          'shadow-opacity':   0.5,
+          'shadow-blur':      12,
+          'z-index':          2,
+        }
+      },
+      // ── Alerta
+      {
+        selector: 'node[status = "warning"]',
+        style: {
+          'background-color': '#1a1300',
+          'border-color':     '#ffab00',
+          'shadow-color':     '#ffab00',
+          'shadow-opacity':   0.5,
+        }
+      },
+      // ── Offline
+      {
+        selector: 'node[status = "offline"]',
+        style: {
+          'background-color': '#1a040c',
+          'border-color':     '#ff3366',
+          'border-style':     'dashed',
+          'shadow-color':     '#ff3366',
+          'shadow-opacity':   0.25,
+          'shadow-blur':      8,
+          'opacity':          0.6,
+        }
+      },
+      // ── Seleccionado
+      {
+        selector: 'node:selected',
+        style: {
+          'border-color':    '#00d4ff',
+          'border-width':    3,
+          'shadow-color':    '#00d4ff',
+          'shadow-opacity':  0.85,
+          'shadow-blur':     22,
+          'overlay-color':   '#00d4ff',
+          'overlay-padding': 4,
+          'overlay-opacity': 0.06,
+        }
+      },
+      // ── Aristas
+      {
+        selector: 'edge',
+        style: {
+          'width':              1.5,
+          'line-color':         '#00d4ff',
+          'line-opacity':       0.15,
+          'curve-style':        'straight',
+          'target-arrow-shape': 'none',
+          'z-index':            0,
+        }
+      },
+      {
+        selector: 'edge:selected',
+        style: { 'line-color':'#00d4ff', 'line-opacity':0.6, 'width':2.5 }
+      },
+    ],
+    layout: {
+      name:           'concentric',
+      animate:        true,
+      animationDuration: 700,
+      fit:            true,
+      padding:        60,
+      startAngle:     -Math.PI / 2,
+      concentric:     n => n.degree(),
+      levelWidth:     () => 1,
+      minNodeSpacing: 40,
+      equidistant:    false,
+    },
+    minZoom:          0.2,
+    maxZoom:          5,
+    wheelSensitivity: 0.25,
+  });
+
+  cy.on('tap', 'node', evt => {
+    const n   = topo.nodes.find(x => String(x.id) === String(evt.target.data('_orig_id')));
+    if (!n) return;
+    const dev = window.AJFLUX.devices.find(d => d.ip === n.ip);
+    const panel = document.getElementById('topo-info');
+    panel.classList.add('visible');
+    document.getElementById('topo-icon').textContent   = dIcon(n.type);
+    document.getElementById('topo-name').textContent   = (n.label || n.ip || '').split('\n')[0];
+    document.getElementById('topo-detail').textContent =
+      `IP: ${n.ip||'—'}  ·  MAC: ${n.mac||'—'}  ·  Fabricante: ${n.vendor||'—'}  ·  Tipo: ${dTypeEs(n.type)}`;
+    document.getElementById('topo-lat').textContent    = dev&&dev.latency ? dev.latency.toFixed(0)+'ms' : '—';
+    document.getElementById('topo-jitter').textContent = dev&&dev.jitter  ? dev.jitter.toFixed(1)+'ms'  : '—';
+    document.getElementById('topo-loss').textContent   = dev&&dev.loss    ? dev.loss.toFixed(1)+'%'     : '—';
+    document.getElementById('topo-qos').textContent    = dev&&dev.qos     ? dev.qos.toFixed(0)+'%'      : '—';
+  });
+
+  cy.on('tap', evt => {
+    if (evt.target === cy) {
+      document.getElementById('topo-info').classList.remove('visible');
+    }
+  });
+}
+
+function fitTopology() {
+  if (cy) cy.animate({ fit:{ eles: cy.elements(), padding:50 }, duration:600, easing:'ease-in-out-quad' });
+}
+
+function onScanComplete() { refreshTopology(); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderTopoReference(null);
+  refreshTopology();
+});
+</script>
+{% endblock %}

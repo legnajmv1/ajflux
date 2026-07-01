@@ -1,0 +1,284 @@
+{% extends "monitor/base.html" %}
+{% load static %}
+
+{% block title %}Métricas{% endblock %}
+{% block page_title %}Métricas QoS{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Selector de dispositivos */
+.device-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  margin-bottom: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: rgba(10,18,30,0.85);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(12px);
+}
+
+.device-btn {
+  display: flex;
+  align-items: center;
+  gap: .375rem;
+  padding: .375rem 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--on-surface-2);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all .2s;
+}
+.device-btn:hover {
+  border-color: var(--border-2);
+  color: var(--on-surface);
+  background: rgba(0,212,255,.05);
+}
+.device-btn.active {
+  background: rgba(0,212,255,.12);
+  border-color: rgba(0,212,255,.35);
+  color: var(--primary);
+  box-shadow: 0 0 12px rgba(0,212,255,.12);
+}
+.device-btn .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Cards de métricas */
+.metric-card {
+  background: rgba(10,18,30,0.85);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 1.25rem;
+  backdrop-filter: blur(12px);
+  transition: border-color .2s;
+  position: relative;
+  overflow: hidden;
+}
+.metric-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: var(--line-color, var(--primary));
+  opacity: .6;
+}
+.metric-card:hover {
+  border-color: var(--border-2);
+}
+
+/* Tabla métricas */
+.metrics-summary-wrap {
+  background: rgba(10,18,30,0.85);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  margin-top: 1.25rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 style="font-size:1.5rem">Métricas QoS</h2>
+    <p>Latencia, jitter, pérdida de paquetes y puntaje QoS en tiempo real.</p>
+  </div>
+</div>
+
+<!-- SELECTOR DE DISPOSITIVO -->
+<div class="device-selector" id="metric-device-btns">
+  <span style="font-size:.68rem;color:var(--on-surface-3);align-self:center;margin-right:.25rem;font-family:var(--font-mono)">DISPOSITIVO:</span>
+</div>
+
+<!-- GRÁFICOS 2x2 -->
+<div class="grid-2" style="margin-bottom:.25rem">
+
+  <div class="metric-card" style="--line-color: #00d4ff">
+    <div class="card-title" style="margin-bottom:1rem">
+      <span class="material-symbols-outlined" style="color:#00d4ff">network_ping</span>
+      Latencia
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#00d4ff" id="cur-latency">— ms</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-latency"></canvas></div>
+  </div>
+
+  <div class="metric-card" style="--line-color: #ffab00">
+    <div class="card-title" style="margin-bottom:1rem">
+      <span class="material-symbols-outlined" style="color:#ffab00">ssid_chart</span>
+      Jitter
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#ffab00" id="cur-jitter">— ms</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-jitter"></canvas></div>
+  </div>
+
+  <div class="metric-card" style="--line-color: #ff3366">
+    <div class="card-title" style="margin-bottom:1rem">
+      <span class="material-symbols-outlined" style="color:#ff3366">signal_wifi_bad</span>
+      Paquetes Perdidos
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#ff3366" id="cur-loss">— %</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-loss"></canvas></div>
+  </div>
+
+  <div class="metric-card" style="--line-color: #00e676">
+    <div class="card-title" style="margin-bottom:1rem">
+      <span class="material-symbols-outlined" style="color:#00e676">speed</span>
+      Puntaje QoS
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#00e676" id="cur-qos">— %</span>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-qos"></canvas></div>
+  </div>
+
+</div>
+
+<!-- TABLA RESUMEN -->
+<div class="metrics-summary-wrap">
+  <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem">
+    <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">summarize</span>
+    <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Resumen por Dispositivo</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Dispositivo</th>
+        <th class="right">Latencia</th>
+        <th class="right">Jitter</th>
+        <th class="right">Paq. Perdidos</th>
+        <th class="right">QoS</th>
+        <th class="right hide-sm">Estado</th>
+      </tr>
+    </thead>
+    <tbody id="metrics-tbody"></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentMetricDevice = null;
+
+function renderMetricBtns() {
+  const devs = window.AJFLUX.devices.filter(d => d.status !== 'offline');
+  const wrap = document.getElementById('metric-device-btns');
+
+  const statusColor = s => s === 'online' ? 'var(--green)' : s === 'warning' ? 'var(--amber)' : 'var(--red)';
+
+  wrap.innerHTML =
+    `<span style="font-size:.68rem;color:var(--on-surface-3);align-self:center;margin-right:.25rem;font-family:var(--font-mono)">DISPOSITIVO:</span>` +
+    `<button class="device-btn active" id="mb-all" onclick="selectMetricDevice(null)">
+      <span class="dot" style="background:var(--primary)"></span>
+      Todos
+    </button>` +
+    devs.map(d => `
+    <button class="device-btn" id="mb-${d.id}" onclick="selectMetricDevice(${d.id})">
+      <span class="dot" style="background:${statusColor(d.status)}"></span>
+      ${d.hostname || d.ip}
+    </button>`).join('');
+
+  renderMetricsTable();
+}
+
+function selectMetricDevice(id) {
+  currentMetricDevice = id;
+  document.querySelectorAll('.device-btn').forEach(b => b.classList.remove('active'));
+  const active = document.getElementById(id ? `mb-${id}` : 'mb-all');
+  if (active) active.classList.add('active');
+  loadMetricCharts();
+}
+
+function loadMetricCharts() {
+  const url = currentMetricDevice
+    ? `/api/metricas/?device_id=${currentMetricDevice}&minutos=30`
+    : '/api/metricas/?minutos=30';
+  fetch(url).then(r => r.json()).then(data => buildCharts(data.metrics || {}));
+}
+
+function buildCharts(metrics) {
+  const keys = Object.keys(metrics);
+  if (!keys.length) return;
+
+  let labels=[], latD=[], jitD=[], lossD=[], qosD=[];
+
+  if (currentMetricDevice && metrics[currentMetricDevice]) {
+    const m = metrics[currentMetricDevice];
+    labels = m.history.map(h => new Date(h.ts).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit',second:'2-digit'}));
+    latD  = m.history.map(h => h.latency);
+    jitD  = m.history.map(h => h.jitter);
+    lossD = m.history.map(h => h.loss);
+    qosD  = m.history.map(h => h.qos);
+  } else {
+    const first = metrics[keys[0]];
+    labels = first.history.map(h => new Date(h.ts).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'}));
+    const len = labels.length;
+    latD = Array(len).fill(0); jitD = Array(len).fill(0);
+    lossD = Array(len).fill(0); qosD = Array(len).fill(0);
+    let cnt = 0;
+    for (const k of keys) {
+      const m = metrics[k]; if (!m || !m.history.length) continue; cnt++;
+      m.history.slice(0,len).forEach((h,i) => {
+        latD[i]+=(h.latency||0); jitD[i]+=(h.jitter||0);
+        lossD[i]+=(h.loss||0);   qosD[i]+=(h.qos||0);
+      });
+    }
+    if (cnt>0) {
+      latD=latD.map(v=>+(v/cnt).toFixed(2)); jitD=jitD.map(v=>+(v/cnt).toFixed(2));
+      lossD=lossD.map(v=>+(v/cnt).toFixed(2)); qosD=qosD.map(v=>+(v/cnt).toFixed(2));
+    }
+  }
+
+  makeLineChart('chart-latency', labels, [chartDataset(latD,'#00d4ff','Latencia')],  'ms');
+  makeLineChart('chart-jitter',  labels, [chartDataset(jitD,'#ffab00','Jitter')],     'ms');
+  makeLineChart('chart-loss',    labels, [chartDataset(lossD,'#ff3366','Pérdida')],   '%');
+  makeLineChart('chart-qos',     labels, [chartDataset(qosD,'#00e676','QoS')],        '%');
+
+  // Actualizar valores actuales (último punto)
+  const last = i => Array.isArray(i) && i.length ? i[i.length-1] : null;
+  const setVal = (id, v, unit) => { const el = document.getElementById(id); if(el) el.textContent = v != null ? v.toFixed(1)+unit : '—'; };
+  setVal('cur-latency', last(latD),  ' ms');
+  setVal('cur-jitter',  last(jitD),  ' ms');
+  setVal('cur-loss',    last(lossD), ' %');
+  setVal('cur-qos',     last(qosD),  ' %');
+}
+
+function renderMetricsTable() {
+  const devs  = window.AJFLUX.devices.filter(d => d.status !== 'offline');
+  const tbody = document.getElementById('metrics-tbody');
+  if (!devs.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:2.5rem;color:var(--on-surface-3);font-size:.84rem">Sin dispositivos en línea</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = devs.map(d => `
+    <tr onclick="openModal(${d.id})" style="cursor:pointer">
+      <td>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <span class="material-symbols-outlined"
+            style="color:var(--on-surface-3);font-size:1.1rem;opacity:.7">${dIcon(d.type)}</span>
+          <div>
+            <div style="font-weight:600;color:var(--on-surface)">${d.hostname||d.ip}</div>
+            <div class="mono muted" style="font-size:.72rem">${d.ip}</div>
+          </div>
+        </div>
+      </td>
+      <td class="right mono ${latClass(d.latency)}"  style="font-weight:700;font-size:.84rem">${fLat(d.latency)}</td>
+      <td class="right mono muted"                    style="font-size:.84rem">${fJit(d.jitter)}</td>
+      <td class="right mono ${lossClass(d.loss)}"    style="font-size:.84rem">${fLoss(d.loss)}</td>
+      <td class="right mono ${qosClass(d.qos)}"      style="font-weight:700;font-size:.84rem">${fQos(d.qos)}</td>
+      <td class="right hide-sm">${statusChip(d.status)}</td>
+    </tr>`).join('');
+}
+
+document.addEventListener('ajflux:devices', () => { renderMetricBtns(); loadMetricCharts(); });
+document.addEventListener('DOMContentLoaded', () => { renderMetricBtns(); loadMetricCharts(); });
+</script>
+{% endblock %}

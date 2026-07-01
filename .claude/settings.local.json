@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sqlite3 ajflux.db \"SELECT u.id, u.username, u.first_name, u.last_name, p.role FROM auth_user u LEFT JOIN perfiles_usuario p ON u.id = p.user_id ORDER BY u.id;\")",
+      "Bash(venv/bin/python -c ' *)",
+      "Bash(pkill -f \"manage.py runserver\")",
+      "Bash(sudo venv/bin/python manage.py runserver 0.0.0.0:8000)"
+    ]
+  }
+}

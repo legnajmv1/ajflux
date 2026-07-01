@@ -1,0 +1,356 @@
+{% extends "monitor/base.html" %}
+{% load static %}
+
+{% block title %}Dispositivos{% endblock %}
+{% block page_title %}Dispositivos de Red{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Barra de resumen */
+.summary-bar {
+  display: flex;
+  gap: .625rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+.summary-pill {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  background: rgba(10,18,30,0.85);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: .78rem;
+  font-weight: 600;
+  backdrop-filter: blur(8px);
+  transition: border-color .2s, box-shadow .2s;
+}
+.summary-pill:hover {
+  border-color: var(--border-2);
+  box-shadow: 0 0 16px rgba(0,212,255,.06);
+}
+.summary-pill .material-symbols-outlined { font-size: .95rem; }
+
+/* Filtros */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: .625rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding: .875rem 1.25rem;
+  background: rgba(10,18,30,0.85);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(12px);
+}
+
+/* Tabla mejorada */
+.devices-table-wrap {
+  background: rgba(10,18,30,0.85);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+}
+.devices-table-wrap thead th {
+  background: rgba(0,212,255,.02);
+  border-bottom: 1px solid var(--border);
+}
+.device-row {
+  transition: background .15s, border-left .15s;
+  border-left: 3px solid transparent;
+}
+.device-row:hover {
+  background: rgba(0,212,255,.04) !important;
+  border-left-color: rgba(0,212,255,.35);
+}
+.device-icon-wrap {
+  width: 36px; height: 36px;
+  border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; font-size: 1.1rem;
+}
+/* Chips de puertos */
+.port-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: .63rem;
+  font-weight: 700;
+  border: 1px solid;
+  cursor: default;
+  position: relative;
+}
+.port-chip:hover .port-tooltip { display: block; }
+.port-tooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%; transform: translateX(-50%);
+  background: rgba(6,12,22,0.97);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 9px;
+  white-space: nowrap;
+  font-size: .68rem;
+  color: var(--on-surface);
+  z-index: 50;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  font-family: var(--font-mono);
+  pointer-events: none;
+}
+.ports-cell { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.ports-more {
+  font-size: .6rem; color: var(--on-surface-3);
+  font-family: var(--font-mono); cursor: pointer;
+}
+/* Estado vacío */
+.empty-state {
+  text-align: center; padding: 4rem 1rem;
+  color: var(--on-surface-3);
+}
+.empty-state .material-symbols-outlined {
+  display: block; font-size: 3.5rem; opacity: .15; margin-bottom: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h2 style="font-size:1.5rem">Dispositivos</h2>
+    <p>Todos los equipos detectados con métricas QoS en tiempo real.</p>
+  </div>
+</div>
+
+<!-- RESUMEN -->
+<div class="summary-bar" id="device-summary"></div>
+
+<!-- FILTROS -->
+<div class="filter-bar">
+  <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">filter_list</span>
+  <input type="text" id="device-search" class="input"
+    placeholder="Buscar IP, nombre, MAC..."
+    oninput="renderDevices()"
+    style="width:220px;font-size:.8rem;padding:.4rem .875rem"/>
+  <select id="device-filter" class="select" onchange="renderDevices()"
+    style="font-size:.8rem;padding:.4rem .875rem">
+    <option value="all">Todos los estados</option>
+    <option value="online">En línea</option>
+    <option value="offline">Desconectado</option>
+    <option value="warning">Con alerta</option>
+  </select>
+  <select id="device-type-filter" class="select" onchange="renderDevices()"
+    style="font-size:.8rem;padding:.4rem .875rem">
+    <option value="all">Todos los tipos</option>
+    <option value="router">Router</option>
+    <option value="desktop">PC</option>
+    <option value="laptop">Laptop</option>
+    <option value="phone">Teléfono</option>
+    <option value="server">Servidor</option>
+    <option value="switch">Switch</option>
+    <option value="iot">IoT</option>
+  </select>
+  <span id="filter-count"
+    style="margin-left:auto;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)"></span>
+</div>
+
+<!-- TABLA -->
+<div class="devices-table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Dispositivo</th>
+        <th class="hide-sm">IP / MAC</th>
+        <th>Puertos abiertos</th>
+        <th class="right">Latencia</th>
+        <th class="right hide-sm">Jitter</th>
+        <th class="right hide-sm">Loss</th>
+        <th class="right">QoS</th>
+      </tr>
+    </thead>
+    <tbody id="device-tbody">
+      <tr>
+        <td colspan="7">
+          <div class="empty-state">
+            <span class="material-symbols-outlined">radar</span>
+            Haz clic en <strong style="color:var(--primary)">Escanear Red</strong> para descubrir dispositivos
+          </div>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ── Mapa de puertos conocidos ─────────────────────────────
+const PORT_NAMES = {
+  21:'FTP', 22:'SSH', 23:'Telnet', 25:'SMTP', 53:'DNS', 80:'HTTP',
+  110:'POP3', 143:'IMAP', 443:'HTTPS', 445:'SMB', 3306:'MySQL',
+  3389:'RDP', 5900:'VNC', 8080:'HTTP-alt', 8443:'HTTPS-alt',
+  8888:'HTTP-alt', 9090:'HTTP-alt', 554:'RTSP', 1883:'MQTT',
+  5353:'mDNS', 137:'NetBIOS', 139:'NetBIOS', 5000:'UPnP',
+};
+const PORT_COLORS = {
+  22:  ['rgba(0,230,118,.12)','rgba(0,230,118,.3)','var(--green)'],
+  80:  ['rgba(0,212,255,.1)', 'rgba(0,212,255,.25)','var(--primary)'],
+  443: ['rgba(0,128,255,.1)', 'rgba(0,128,255,.3)', '#60a5fa'],
+  3389:['rgba(255,51,102,.1)','rgba(255,51,102,.25)','var(--red)'],
+  21:  ['rgba(255,171,0,.1)', 'rgba(255,171,0,.25)','var(--amber)'],
+  23:  ['rgba(255,51,102,.1)','rgba(255,51,102,.25)','var(--red)'],
+  3306:['rgba(124,58,237,.1)','rgba(124,58,237,.3)','#a78bfa'],
+  5900:['rgba(255,171,0,.1)', 'rgba(255,171,0,.25)','var(--amber)'],
+};
+const PORT_COLOR_DEFAULT = ['rgba(90,127,160,.08)','rgba(90,127,160,.2)','var(--on-surface-3)'];
+
+function renderPortChips(ports) {
+  if (!ports || ports.length === 0) {
+    return `<span style="font-size:.7rem;color:var(--on-surface-3)">—</span>`;
+  }
+  const MAX_SHOW = 4;
+  const sorted = [...ports].sort((a,b)=>a-b);
+  const visible = sorted.slice(0, MAX_SHOW);
+  const rest    = sorted.length - MAX_SHOW;
+
+  const chips = visible.map(p => {
+    const name = PORT_NAMES[p] || `p.${p}`;
+    const [bg, bd, fc] = PORT_COLORS[p] || PORT_COLOR_DEFAULT;
+    return `<span class="port-chip" style="background:${bg};border-color:${bd};color:${fc}">
+      ${p}
+      <span class="port-tooltip">${p}/${name}</span>
+    </span>`;
+  }).join('');
+
+  const more = rest > 0
+    ? `<span class="ports-more" title="${sorted.slice(MAX_SHOW).join(', ')}">+${rest}</span>`
+    : '';
+
+  return `<div class="ports-cell">${chips}${more}</div>`;
+}
+
+const ICON_COLORS = {
+  router:'rgba(0,212,255,.12)', switch:'rgba(124,58,237,.12)',
+  server:'rgba(0,128,255,.12)', desktop:'rgba(0,212,255,.08)',
+  laptop:'rgba(0,212,255,.08)', phone:'rgba(0,230,118,.08)',
+  wifi:'rgba(0,212,255,.1)',   iot:'rgba(255,171,0,.08)',
+  default:'rgba(255,255,255,.05)',
+};
+const ICON_STROKE = {
+  router:'rgba(0,212,255,.4)', switch:'rgba(124,58,237,.4)',
+  server:'rgba(0,128,255,.4)', online:'rgba(0,230,118,.3)',
+  warning:'rgba(255,171,0,.3)', offline:'rgba(255,51,102,.3)',
+  default:'rgba(255,255,255,.1)',
+};
+
+function deviceIconWrap(type, status) {
+  const bg    = ICON_COLORS[type]  || ICON_COLORS.default;
+  const border = status === 'offline' ? ICON_STROKE.offline
+               : status === 'warning' ? ICON_STROKE.warning
+               : ICON_STROKE[type]   || ICON_STROKE.default;
+  return `<div class="device-icon-wrap" style="background:${bg};border:1px solid ${border}">
+    <span class="material-symbols-outlined" style="color:${statusIconColor(status,type)}">${dIcon(type)}</span>
+  </div>`;
+}
+
+function statusIconColor(status, type) {
+  if (status === 'offline') return 'var(--red)';
+  if (status === 'warning') return 'var(--amber)';
+  const map = { router:'var(--primary)', switch:'#a78bfa', server:'#60a5fa' };
+  return map[type] || 'var(--on-surface-2)';
+}
+
+function renderDevices() {
+  const devs       = window.AJFLUX.devices;
+  const search     = (document.getElementById('device-search').value || '').toLowerCase();
+  const filter     = document.getElementById('device-filter').value;
+  const typeFilter = document.getElementById('device-type-filter').value;
+
+  // Resumen pills
+  const total   = devs.length;
+  const online  = devs.filter(d => d.status === 'online').length;
+  const offline = devs.filter(d => d.status === 'offline').length;
+  const warn    = devs.filter(d => d.status === 'warning').length;
+  const gws     = devs.filter(d => d.is_gateway).length;
+
+  document.getElementById('device-summary').innerHTML = [
+    ['devices',  'Total',        total,   'var(--on-surface-2)'],
+    ['wifi',     'En línea',     online,  'var(--green)'],
+    ['warning',  'Alerta',       warn,    'var(--amber)'],
+    ['wifi_off', 'Desconectado', offline, 'var(--red)'],
+    ['router',   'Gateways',     gws,     'var(--primary)'],
+  ].map(([icon, label, val, color]) => `
+    <div class="summary-pill">
+      <span class="material-symbols-outlined" style="color:${color}">${icon}</span>
+      <span style="color:var(--on-surface-3)">${label}:</span>
+      <span style="font-weight:700;color:${color};font-family:var(--font-mono)">${val}</span>
+    </div>`).join('');
+
+  // Filtrar
+  let filtered = [...devs];
+  if (filter !== 'all')     filtered = filtered.filter(d => d.status === filter);
+  if (typeFilter !== 'all') filtered = filtered.filter(d => d.type === typeFilter);
+  if (search)               filtered = filtered.filter(d =>
+    (d.ip||'').includes(search) ||
+    (d.hostname||'').toLowerCase().includes(search) ||
+    (d.mac||'').toLowerCase().includes(search));
+
+  const countEl = document.getElementById('filter-count');
+  countEl.textContent = filtered.length !== total
+    ? `${filtered.length} de ${total} dispositivos`
+    : `${total} dispositivos`;
+
+  const tbody = document.getElementById('device-tbody');
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7">
+      <div class="empty-state">
+        <span class="material-symbols-outlined">search_off</span>
+        ${devs.length ? 'Sin resultados para los filtros aplicados' : 'Ejecuta un escaneo para descubrir dispositivos'}
+      </div>
+    </td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(d => {
+    const gw = d.is_gateway
+      ? `<span style="font-size:.6rem;background:rgba(0,212,255,.1);color:var(--primary);
+          border:1px solid rgba(0,212,255,.25);padding:1px 6px;border-radius:999px;
+          font-weight:700;margin-left:4px;font-family:var(--font-mono)">GW</span>`
+      : '';
+
+    return `<tr class="device-row" onclick="openModal(${d.id})">
+      <td>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          ${deviceIconWrap(d.type, d.status)}
+          <div>
+            <div style="font-weight:600;display:flex;align-items:center;gap:.25rem;color:var(--on-surface)">
+              ${d.hostname || d.ip}${gw}
+            </div>
+            <div style="margin-top:4px">${statusChip(d.status)}</div>
+          </div>
+        </div>
+      </td>
+      <td class="hide-sm">
+        <div class="mono" style="font-weight:600;color:var(--primary);font-size:.82rem">${d.ip}</div>
+        <div class="mono muted" style="font-size:.72rem">${d.mac || '—'}</div>
+      </td>
+      <td>${renderPortChips(d.open_ports || [])}</td>
+      <td class="right mono ${latClass(d.latency)}" style="font-weight:700;font-size:.84rem">${fLat(d.latency)}</td>
+      <td class="right mono muted hide-sm" style="font-size:.84rem">${fJit(d.jitter)}</td>
+      <td class="right mono hide-sm ${lossClass(d.loss)}" style="font-size:.84rem">${fLoss(d.loss)}</td>
+      <td class="right mono ${qosClass(d.qos)}" style="font-weight:700;font-size:.84rem">${fQos(d.qos)}</td>
+    </tr>`;
+  }).join('');
+}
+
+document.addEventListener('ajflux:devices',      () => renderDevices());
+document.addEventListener('ajflux:scan_complete', () => renderDevices());
+document.addEventListener('DOMContentLoaded',     renderDevices);
+</script>
+{% endblock %}

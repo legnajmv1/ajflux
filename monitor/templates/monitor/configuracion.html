@@ -1,0 +1,517 @@
+{% extends "monitor/base.html" %}
+{% load static %}
+
+{% block title %}Configuración{% endblock %}
+{% block page_title %}Configuración del Sistema{% endblock %}
+
+{% block extra_css %}
+<style>
+.config-section {
+  background: rgba(10,18,30,0.9);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  backdrop-filter: blur(12px);
+  margin-bottom: 1.25rem;
+}
+.config-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .875rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,212,255,.02);
+  flex-wrap: wrap;
+  gap: .75rem;
+}
+.config-section-body { padding: 1.25rem 1.5rem; }
+
+/* Countdown ring */
+.countdown-ring { position: relative; width: 80px; height: 80px; flex-shrink: 0; }
+.countdown-ring svg { transform: rotate(-90deg); }
+.countdown-val {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: .78rem; font-weight: 700; color: var(--on-surface);
+}
+.countdown-val span { font-size: .58rem; color: var(--on-surface-3); font-weight: 400; }
+
+/* Mini stat box */
+.mini-box {
+  background: rgba(0,212,255,.04);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: .875rem;
+  text-align: center;
+  min-width: 90px;
+}
+.mini-box .val { font-weight: 800; font-size: 1.2rem; font-family: var(--font-mono); }
+.mini-box .lbl { font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; color: var(--on-surface-3); margin-top: 2px; }
+
+/* Umbrales */
+.thr-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr auto;
+  gap: .5rem;
+  align-items: center;
+  padding: .625rem 1rem;
+  border-bottom: 1px solid rgba(0,212,255,.04);
+  transition: background .15s;
+}
+.thr-grid:last-child { border-bottom: none; }
+.thr-grid:hover { background: rgba(0,212,255,.03); }
+.thr-head {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr auto;
+  gap: .5rem;
+  padding: .5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(0,212,255,.02);
+}
+.thr-input {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: .3rem .5rem;
+  color: var(--on-surface);
+  font-family: var(--font-mono);
+  font-size: .78rem;
+  width: 100%;
+  outline: none;
+  text-align: center;
+  transition: border-color .2s, box-shadow .2s;
+}
+.thr-input:focus { border-color: var(--border-2); box-shadow: 0 0 0 2px rgba(0,212,255,.08); }
+.thr-input.custom { border-color: rgba(0,212,255,.3); background: rgba(0,212,255,.04); }
+.thr-input::placeholder { color: var(--on-surface-3); font-size: .7rem; }
+
+.save-thr {
+  background: rgba(0,212,255,.08);
+  border: 1px solid rgba(0,212,255,.2);
+  color: var(--primary);
+  border-radius: var(--r-sm);
+  padding: .3rem .625rem;
+  cursor: pointer;
+  font-size: .7rem;
+  font-weight: 700;
+  font-family: var(--font);
+  transition: all .2s;
+  white-space: nowrap;
+  display: flex; align-items: center; gap: .25rem;
+}
+.save-thr:hover { background: rgba(0,212,255,.15); box-shadow: 0 0 10px rgba(0,212,255,.15); }
+
+.reset-thr {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--on-surface-3);
+  border-radius: var(--r-sm);
+  padding: .3rem .5rem;
+  cursor: pointer;
+  font-size: .7rem;
+  transition: all .2s;
+  display: flex; align-items: center;
+}
+.reset-thr:hover { border-color: rgba(255,51,102,.3); color: var(--red); }
+
+/* Interfaz de red */
+.iface-card {
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 1rem;
+  margin-bottom: .625rem;
+}
+.iface-card:last-child { margin-bottom: 0; }
+
+/* Toast */
+.saved-toast {
+  position: fixed; bottom: 1.5rem; right: 1.5rem;
+  background: rgba(10,18,30,0.95);
+  border: 1px solid rgba(0,230,118,.3);
+  color: var(--green);
+  padding: .75rem 1.25rem;
+  border-radius: var(--r);
+  font-size: .84rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  z-index: 9999;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all .3s;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  box-shadow: var(--shadow-lg);
+}
+.saved-toast.show { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 900px) {
+  .thr-grid, .thr-head { grid-template-columns: 2fr 1fr 1fr auto; }
+  .hide-sm-thr { display: none !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="saved-toast" id="saved-toast">
+  <span class="material-symbols-outlined" style="font-size:1rem">check_circle</span>
+  <span id="toast-msg">Guardado correctamente</span>
+</div>
+
+<div class="page-header">
+  <div>
+    <h2 style="font-size:1.5rem">Configuración</h2>
+    <p>Estado del monitor en tiempo real, umbrales personalizados e interfaces de red.</p>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" onclick="triggerScan()" data-admin-only>
+      <span class="material-symbols-outlined">radar</span>Escanear Ahora
+    </button>
+  </div>
+</div>
+
+<!-- ESTADO DEL MONITOR -->
+<div class="config-section">
+  <div class="config-section-header">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">schedule</span>
+      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Estado del Monitor</span>
+    </div>
+  </div>
+  <div class="config-section-body">
+    <div style="display:flex;align-items:center;gap:2rem;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:1.25rem">
+        <div class="countdown-ring">
+          <svg width="80" height="80" viewBox="0 0 80 80">
+            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(0,212,255,.08)" stroke-width="6"/>
+            <circle id="countdown-circle" cx="40" cy="40" r="34" fill="none"
+              stroke="url(#cdGrad)" stroke-width="6" stroke-linecap="round"
+              stroke-dasharray="213.6" stroke-dashoffset="0"
+              style="transition:stroke-dashoffset 1s linear"/>
+            <defs>
+              <linearGradient id="cdGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#00d4ff"/>
+                <stop offset="100%" stop-color="#0080ff"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <div class="countdown-val">
+            <strong id="countdown-num">—</strong>
+            <span>seg</span>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:700;color:var(--on-surface);font-size:.875rem">Próximo escaneo</div>
+          <div style="font-size:.72rem;color:var(--on-surface-3);margin-top:2px;font-family:var(--font-mono)" id="next-scan-label">Calculando...</div>
+          <div style="font-size:.68rem;color:var(--on-surface-3);margin-top:2px;font-family:var(--font-mono)" id="last-scan-label">—</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.625rem;flex-wrap:wrap">
+        <div class="mini-box">
+          <div class="val" style="color:var(--primary)" id="mon-ping">—</div>
+          <div class="lbl">Ping cada (s)</div>
+        </div>
+        <div class="mini-box">
+          <div class="val" style="color:var(--amber)" id="mon-scan">—</div>
+          <div class="lbl">Escaneo (min)</div>
+        </div>
+        <div class="mini-box">
+          <div class="val" style="color:var(--green)" id="mon-found">—</div>
+          <div class="lbl">Dispositivos</div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
+      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.75rem">Umbrales Globales</div>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem" id="global-thresholds"></div>
+    </div>
+  </div>
+</div>
+
+<!-- UMBRALES POR DISPOSITIVO -->
+<div class="config-section">
+  <div class="config-section-header">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--amber)">notifications_active</span>
+      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Umbrales de Alerta por Dispositivo</span>
+    </div>
+    <span style="font-size:.68rem;color:var(--on-surface-3)">Vacío = valor global · <strong style="color:var(--primary)">Guardar</strong> para aplicar</span>
+  </div>
+
+  <div class="thr-head">
+    <div class="label">Dispositivo</div>
+    <div class="label" style="text-align:center">Lat. Alerta<br><span style="font-size:.6rem">(ms)</span></div>
+    <div class="label" style="text-align:center">Lat. Crítica<br><span style="font-size:.6rem">(ms)</span></div>
+    <div class="label hide-sm-thr" style="text-align:center">Jitter<br><span style="font-size:.6rem">(ms)</span></div>
+    <div class="label hide-sm-thr" style="text-align:center">Loss<br><span style="font-size:.6rem">(%)</span></div>
+    <div class="label hide-sm-thr" style="text-align:center">QoS mín<br><span style="font-size:.6rem">(%)</span></div>
+    <div class="label" style="text-align:center">Acción</div>
+  </div>
+
+  <div id="thresholds-body">
+    <div style="text-align:center;padding:2.5rem;color:var(--on-surface-3)">
+      <span class="material-symbols-outlined" style="display:block;font-size:2rem;opacity:.15;margin-bottom:.5rem">radar</span>
+      <span style="font-size:.84rem">Cargando dispositivos...</span>
+    </div>
+  </div>
+</div>
+
+<!-- INTERFACES DE RED -->
+<div class="config-section">
+  <div class="config-section-header">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--blue)">wifi_tethering</span>
+      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Interfaces de Red Detectadas</span>
+    </div>
+  </div>
+  <div class="config-section-body" id="network-info-panel">
+    <p style="color:var(--on-surface-3);font-size:.84rem">Cargando...</p>
+  </div>
+</div>
+
+<!-- ACCIONES -->
+<div class="config-section">
+  <div class="config-section-header">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">build</span>
+      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Acciones</span>
+    </div>
+  </div>
+  <div class="config-section-body" style="display:flex;flex-direction:column;gap:.625rem">
+    <button onclick="triggerScan()" class="btn btn-primary"
+      style="justify-content:space-between;padding:1rem 1.25rem" data-admin-only>
+      <span>Ejecutar Escaneo de Red Ahora</span>
+      <span class="material-symbols-outlined">radar</span>
+    </button>
+    <a href="/reportes/exportar-pdf/" target="_blank" class="btn btn-secondary"
+      style="justify-content:space-between;padding:1rem 1.25rem">
+      <span>Exportar Reporte PDF Completo</span>
+      <span class="material-symbols-outlined">picture_as_pdf</span>
+    </a>
+  </div>
+</div>
+
+<!-- ACERCA DE -->
+<div class="config-section">
+  <div class="config-section-header">
+    <div style="display:flex;align-items:center;gap:.5rem">
+      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">info</span>
+      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Acerca de AJFLUX</span>
+    </div>
+  </div>
+  <div class="config-section-body">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:1rem">
+      {% for item in about_items %}
+      <div>
+        <div class="label">{{ item.label }}</div>
+        <div style="color:var(--on-surface);font-weight:600;margin-top:.25rem;font-family:var(--font-mono);font-size:.84rem">{{ item.value }}</div>
+      </div>
+      {% empty %}
+      <div><div class="label">Versión</div><div style="color:var(--on-surface);font-weight:600;margin-top:.25rem;font-family:var(--font-mono);font-size:.84rem">3.0.0</div></div>
+      <div><div class="label">Framework</div><div style="color:var(--on-surface);font-weight:600;margin-top:.25rem;font-family:var(--font-mono);font-size:.84rem">Django 4.2</div></div>
+      <div><div class="label">ARP Scan</div><div style="color:var(--on-surface);font-weight:600;margin-top:.25rem;font-family:var(--font-mono);font-size:.84rem">Scapy 2.5</div></div>
+      <div><div class="label">Port Scan</div><div style="color:var(--on-surface);font-weight:600;margin-top:.25rem;font-family:var(--font-mono);font-size:.84rem">python-nmap</div></div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let GLOBALS = {};
+let SCAN_INTERVAL = 600;
+let countdownTimer = null;
+
+function loadMonitorStatus() {
+  fetch('/api/monitor/estado/')
+    .then(r => r.json())
+    .then(data => {
+      GLOBALS = data;
+      SCAN_INTERVAL = data.scan_interval || 600;
+      document.getElementById('mon-ping').textContent  = data.ping_interval || '—';
+      document.getElementById('mon-scan').textContent  = data.scan_interval_min || '—';
+      document.getElementById('mon-found').textContent = data.last_scan_found || '—';
+
+      if (data.last_scan) {
+        const ts = new Date(data.last_scan).toLocaleString('es',{dateStyle:'short',timeStyle:'short'});
+        document.getElementById('last-scan-label').textContent = `Último: ${ts} · ${data.last_scan_network||'—'}`;
+      }
+
+      const gEl = document.getElementById('global-thresholds');
+      gEl.innerHTML = [
+        ['Lat. Alerta',  data.latency_warning_ms + ' ms', 'var(--amber)'],
+        ['Lat. Crítica', data.latency_alert_ms   + ' ms', 'var(--red)'],
+        ['Loss Máx.',    data.loss_alert_pct      + '%',  'var(--red)'],
+        ['Ping cada',    data.ping_interval        + 's',  'var(--primary)'],
+        ['Escaneo',     (data.scan_interval/60)   + ' min','var(--primary)'],
+      ].map(([label, val, color]) =>
+        `<div class="mini-box">
+          <div class="val" style="color:${color};font-size:.9rem">${val}</div>
+          <div class="lbl">${label}</div>
+        </div>`).join('');
+
+      startCountdown(data.next_scan_in_sec || SCAN_INTERVAL);
+    }).catch(() => {});
+}
+
+function startCountdown(seconds) {
+  if (countdownTimer) clearInterval(countdownTimer);
+  let remaining = Math.max(0, seconds);
+  const total   = SCAN_INTERVAL;
+  const circ    = 213.6;
+
+  function tick() {
+    if (remaining < 0) { remaining = SCAN_INTERVAL; loadMonitorStatus(); return; }
+    const offset = circ - circ * (remaining / total);
+    document.getElementById('countdown-circle').setAttribute('stroke-dashoffset', offset);
+    const min = Math.floor(remaining / 60);
+    const sec = remaining % 60;
+    document.getElementById('countdown-num').textContent =
+      remaining < 60 ? remaining : `${min}:${sec.toString().padStart(2,'0')}`;
+    document.getElementById('next-scan-label').textContent =
+      remaining < 60 ? `En ${remaining} segundos` : `En ${min} min ${sec} seg`;
+    remaining--;
+  }
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
+function loadThresholds() {
+  fetch('/api/umbrales/')
+    .then(r => r.json())
+    .then(data => {
+      GLOBALS = { ...GLOBALS, ...data.globals };
+      renderThresholds(data.thresholds || []);
+    }).catch(() => {});
+}
+
+function renderThresholds(thresholds) {
+  const body = document.getElementById('thresholds-body');
+  if (!thresholds.length) {
+    body.innerHTML = `<div style="text-align:center;padding:2.5rem;color:var(--on-surface-3);font-size:.84rem">Sin dispositivos. Ejecuta un escaneo primero.</div>`;
+    return;
+  }
+  const g = GLOBALS;
+  const ph = (val, gval, unit) => ({
+    cls: val !== null ? 'thr-input custom' : 'thr-input',
+    v:   val !== null ? val : '',
+    ph:  `Global: ${gval}${unit}`,
+  });
+
+  body.innerHTML = thresholds.map(t => {
+    const sc   = t.status==='online' ? 'chip-online' : t.status==='warning' ? 'chip-warning' : 'chip-offline';
+    const stlb = t.status==='online' ? 'En línea' : t.status==='warning' ? 'Alerta' : 'Offline';
+    const lw = ph(t.latency_warning,  g.latency_warning,  'ms');
+    const lc = ph(t.latency_critical, g.latency_critical, 'ms');
+    const jw = ph(t.jitter_warning,   g.jitter_warning,   'ms');
+    const lo = ph(t.loss_warning,     g.loss_warning,     '%');
+    const qm = ph(t.qos_minimum,      0,                  '%');
+
+    return `<div class="thr-grid" id="thr-row-${t.device_id}">
+      <div style="display:flex;align-items:center;gap:.5rem;min-width:0">
+        <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3);flex-shrink:0">${dIcon(t.type)}</span>
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:.8rem;color:var(--on-surface);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.hostname}</div>
+          <div style="display:flex;align-items:center;gap:.3rem;margin-top:2px;flex-wrap:wrap">
+            <span class="mono" style="font-size:.68rem;color:var(--on-surface-3)">${t.ip}</span>
+            <span class="chip ${sc}" style="font-size:.58rem;padding:1px 5px">${stlb}</span>
+            ${t.has_custom ? `<span style="font-size:.6rem;background:rgba(0,212,255,.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-weight:700;font-family:var(--font-mono)">CUSTOM</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <input type="number" class="${lw.cls}" id="lw-${t.device_id}" value="${lw.v}" placeholder="${lw.ph}" min="1" max="9999" oninput="markChanged(${t.device_id})"/>
+      <input type="number" class="${lc.cls}" id="lc-${t.device_id}" value="${lc.v}" placeholder="${lc.ph}" min="1" max="9999" oninput="markChanged(${t.device_id})"/>
+      <input type="number" class="${jw.cls} hide-sm-thr" id="jw-${t.device_id}" value="${jw.v}" placeholder="${jw.ph}" min="1" max="999" oninput="markChanged(${t.device_id})"/>
+      <input type="number" class="${lo.cls} hide-sm-thr" id="lo-${t.device_id}" value="${lo.v}" placeholder="${lo.ph}" min="0" max="100" step="0.1" oninput="markChanged(${t.device_id})"/>
+      <input type="number" class="${qm.cls} hide-sm-thr" id="qm-${t.device_id}" value="${qm.v}" placeholder="${qm.ph}" min="0" max="100" oninput="markChanged(${t.device_id})"/>
+      <div style="display:flex;flex-direction:column;gap:.25rem">
+        <button class="save-thr" onclick="saveThreshold(${t.device_id})">
+          <span class="material-symbols-outlined" style="font-size:.8rem">save</span>Guardar
+        </button>
+        ${t.has_custom ? `<button class="reset-thr" onclick="resetThreshold(${t.device_id})" title="Restablecer">
+          <span class="material-symbols-outlined" style="font-size:.9rem">restart_alt</span>
+        </button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function markChanged(id) {
+  ['lw','lc','jw','lo','qm'].forEach(p => {
+    const el = document.getElementById(`${p}-${id}`);
+    if (el) el.classList.add('custom');
+  });
+}
+
+function saveThreshold(deviceId) {
+  const v = p => { const el = document.getElementById(`${p}-${deviceId}`); return el ? (el.value || null) : null; };
+  fetch(`/api/umbrales/${deviceId}/guardar/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ latency_warning:v('lw'), latency_critical:v('lc'), jitter_warning:v('jw'), loss_warning:v('lo'), qos_minimum:v('qm') }),
+  })
+  .then(r => r.json())
+  .then(d => { if (d.ok) { showToast(`Guardado para ${d.device_ip}`); setTimeout(loadThresholds, 400); } })
+  .catch(() => showToast('Error al guardar', true));
+}
+
+function resetThreshold(deviceId) {
+  if (!confirm('¿Restablecer a valores globales?')) return;
+  fetch(`/api/umbrales/${deviceId}/eliminar/`, { method: 'DELETE' })
+    .then(() => { showToast('Restablecido a valores globales'); setTimeout(loadThresholds, 300); });
+}
+
+function showToast(msg, error=false) {
+  const t = document.getElementById('saved-toast');
+  document.getElementById('toast-msg').textContent = msg;
+  t.style.borderColor = error ? 'rgba(255,51,102,.3)' : 'rgba(0,230,118,.3)';
+  t.style.color = error ? 'var(--red)' : 'var(--green)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function loadNetworkInfo() {
+  fetch('/api/network/')
+    .then(r => r.json())
+    .then(data => {
+      const panel  = document.getElementById('network-info-panel');
+      const ifaces = data.interfaces || [];
+      if (!ifaces.length) { panel.innerHTML = '<p style="color:var(--on-surface-3);font-size:.84rem">Sin interfaces detectadas</p>'; return; }
+      panel.innerHTML = ifaces.map(i => `
+        <div class="iface-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.875rem">
+            <div style="display:flex;align-items:center;gap:.625rem">
+              <div style="width:32px;height:32px;border-radius:var(--r-sm);background:rgba(0,128,255,.1);border:1px solid rgba(0,128,255,.2);display:flex;align-items:center;justify-content:center">
+                <span class="material-symbols-outlined" style="color:var(--blue);font-size:1rem">lan</span>
+              </div>
+              <span class="mono" style="font-weight:700;color:var(--on-surface)">${i.name}</span>
+            </div>
+            <span class="chip chip-online">Activa</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;font-size:.8rem">
+            <div><span style="color:var(--on-surface-3)">IP: </span><span class="mono" style="color:var(--primary)">${i.ip}</span></div>
+            <div><span style="color:var(--on-surface-3)">Máscara: </span><span class="mono" style="color:var(--on-surface)">${i.netmask}</span></div>
+            <div><span style="color:var(--on-surface-3)">Red: </span><span class="mono" style="color:var(--on-surface)">${i.network}</span></div>
+            <div><span style="color:var(--on-surface-3)">Gateway: </span><span class="mono" style="color:var(--on-surface)">${i.gateway||'—'}</span></div>
+          </div>
+        </div>`).join('');
+    }).catch(() => {});
+}
+
+document.addEventListener('ajflux:scan_complete', () => { loadThresholds(); loadMonitorStatus(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadMonitorStatus();
+  loadThresholds();
+  loadNetworkInfo();
+  setInterval(loadMonitorStatus, 60000);
+});
+</script>
+{% endblock %}

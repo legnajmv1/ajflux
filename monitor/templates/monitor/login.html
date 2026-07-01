@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AJFLUX — Iniciar Sesión</title>
+{% load static %}
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<style>
+:root {
+  --cy: #00d4ff; --bl: #0080ff; --pu: #7c3aed; --gr: #00e676; --rd: #ff3366;
+  --bg: #000509; --font: 'Inter',sans-serif; --mono: 'JetBrains Mono',monospace;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body { width:100%; height:100%; background:var(--bg); font-family:var(--font);
+  color:#d0e8ff; overflow:hidden; }
+.material-symbols-outlined {
+  font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;
+  vertical-align:middle;
+}
+
+/* ── CANVAS FONDO: ONDAS COMPLETO ── */
+#wave-bg { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+/* ── ESCENA CENTRADA ── */
+.scene {
+  position:relative; z-index:1;
+  width:100vw; height:100vh;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* ── MONITOR PC ── */
+.monitor { display:flex; flex-direction:column; align-items:center;
+  animation:riseIn .7s cubic-bezier(.16,1,.3,1) both;
+  filter: drop-shadow(0 0 70px rgba(0,212,255,0.20));
+}
+@keyframes riseIn {
+  from { opacity:0; transform:translateY(40px) scale(.97); }
+  to   { opacity:1; transform:translateY(0) scale(1); }
+}
+
+/* Bisel exterior — frame del monitor de PC */
+.bezel {
+  width: min(500px, 94vw);
+  background: linear-gradient(180deg, #152535 0%, #0e1c2c 40%, #0a1520 100%);
+  border: 4px solid rgba(0,212,255,.30);
+  border-radius: 18px 18px 6px 6px;
+  padding: 26px 26px 0;
+  position: relative;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.03),   /* borde interior blanco sutil */
+    0 0 0 6px rgba(0,0,0,.9),          /* separador oscuro exterior */
+    0 0 0 7px rgba(0,212,255,.06),     /* aura cian */
+    0 50px 120px rgba(0,0,0,.98),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.6),
+    inset 2px 0 0 rgba(0,212,255,.03),
+    inset -2px 0 0 rgba(0,212,255,.03);
+}
+.bezel::before {
+  content:''; position:absolute; top:0; left:6%; right:6%; height:2px;
+  background:linear-gradient(90deg,transparent,rgba(0,212,255,.7),transparent);
+  border-radius:0 0 4px 4px;
+}
+.bezel-brand {
+  position:absolute; top:8px; left:50%; transform:translateX(-50%);
+  font-family:var(--mono); font-size:.42rem; letter-spacing:.3em;
+  color:rgba(0,212,255,.32); text-transform:uppercase; white-space:nowrap;
+}
+/* Tornillos de esquina */
+.screw {
+  position:absolute; width:8px; height:8px; border-radius:50%;
+  border:1px solid rgba(0,212,255,.18); background:rgba(0,212,255,.04);
+}
+.screw-tl { top:9px; left:9px; }
+.screw-tr { top:9px; right:9px; }
+/* Franja inferior del bisel — barra de controles */
+.bezel-strip {
+  display:flex; justify-content:center; align-items:center; gap:1rem;
+  padding:14px 0 16px;
+  margin-top:16px;
+  background:linear-gradient(180deg, rgba(0,212,255,.02) 0%, transparent 100%);
+  border-top:1px solid rgba(0,212,255,.09);
+}
+.pwr-btn {
+  width:20px; height:20px; border-radius:50%;
+  border:2px solid rgba(0,212,255,.4); background:rgba(0,0,0,.8);
+  position:relative; flex-shrink:0;
+  box-shadow:inset 0 0 6px rgba(0,212,255,.1);
+}
+.pwr-btn::after {
+  content:''; position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:8px; height:8px; border-radius:50%;
+  background:var(--cy); box-shadow:0 0 10px var(--cy), 0 0 20px rgba(0,212,255,.3);
+  animation:ledBlink 3s ease-in-out infinite;
+}
+.pwr-label {
+  font-family:var(--mono); font-size:.42rem; letter-spacing:.25em;
+  color:rgba(0,212,255,.25); text-transform:uppercase;
+}
+@keyframes ledBlink { 0%,100%{opacity:1}50%{opacity:.25} }
+
+/* Pantalla */
+.screen {
+  background:#000; border-radius:7px;
+  border:1px solid rgba(0,212,255,.08);
+  position:relative; overflow:hidden;
+  box-shadow:inset 0 0 40px rgba(0,0,0,.9), 0 0 0 2px rgba(0,0,0,.8);
+}
+/* CRT scanlines */
+.screen::after {
+  content:''; position:absolute; inset:0; pointer-events:none; z-index:10;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,
+    rgba(0,0,0,.10) 2px,rgba(0,0,0,.10) 4px);
+}
+/* Reflejo esquina */
+.screen::before {
+  content:''; position:absolute; top:0; left:0; right:0; bottom:0;
+  background:linear-gradient(135deg,rgba(0,212,255,.018) 0%,transparent 38%);
+  z-index:1; pointer-events:none;
+}
+
+/* Contenido del form */
+.screen-inner {
+  position:relative; z-index:2;
+  padding:1.875rem 2.25rem 1.625rem;
+}
+
+/* Cuello del stand — trapezoidal, visible */
+.neck {
+  width:60px; height:48px;
+  background:linear-gradient(90deg, #091420 0%, #0e1e30 40%, #0e1e30 60%, #091420 100%);
+  border-left:2px solid rgba(0,212,255,.12);
+  border-right:2px solid rgba(0,212,255,.12);
+  clip-path:polygon(12% 0%, 88% 0%, 100% 100%, 0% 100%);
+}
+/* Base del monitor — ancha, prominente */
+.base {
+  width:min(300px, 68vw); height:22px;
+  background:linear-gradient(180deg, #0f1e2d 0%, #070e18 60%, #050b12 100%);
+  border:2px solid rgba(0,212,255,.16);
+  border-top:none; border-radius:0 0 60px 60px;
+  box-shadow:
+    0 14px 50px rgba(0,0,0,.98),
+    0 0 60px rgba(0,212,255,.05),
+    inset 0 -2px 0 rgba(0,0,0,.5);
+  position:relative;
+}
+.base::before {
+  content:''; position:absolute; top:0; left:12%; right:12%; height:1px;
+  background:rgba(0,212,255,.18);
+}
+/* Patas de la base */
+.base::after {
+  content:''; position:absolute; bottom:3px; left:10%; right:10%; height:2px;
+  background:rgba(0,212,255,.04); border-radius:4px;
+}
+
+/* ── FORM ELEMENTS ── */
+.brand { font-size:1.9rem; font-weight:900; letter-spacing:-.05em;
+  background:linear-gradient(135deg,#00d4ff 30%,#0080ff);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  filter:drop-shadow(0 0 10px rgba(0,212,255,.4));
+}
+.brand-row { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.2rem; }
+.brand-ver { font-family:var(--mono); font-size:.5rem; color:rgba(0,212,255,.35); letter-spacing:.12em; }
+.brand-sub { font-size:.58rem; font-weight:600; text-transform:uppercase; letter-spacing:.15em;
+  color:#3a5878; font-family:var(--mono); margin-bottom:1.5rem; }
+
+.error-msg {
+  background:rgba(255,51,102,.08); border:1px solid rgba(255,51,102,.25);
+  color:#ff6680; border-radius:7px; padding:.65rem .875rem; font-size:.77rem;
+  margin-bottom:1rem; display:flex; align-items:center; gap:.45rem;
+  animation:shake .3s ease;
+}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+
+.field { margin-bottom:.875rem; }
+.field label { display:block; font-size:.58rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.1em; color:#3a5878; margin-bottom:.35rem; }
+.field-wrap { position:relative; }
+.ficon { position:absolute; left:.75rem; top:50%; transform:translateY(-50%);
+  font-size:1rem; color:#3a5878; pointer-events:none; transition:color .2s; }
+.field-wrap:focus-within .ficon { color:var(--cy); }
+.field input {
+  width:100%; background:rgba(0,212,255,.028); border:1px solid rgba(0,212,255,.1);
+  border-radius:7px; padding:.65rem .875rem .65rem 2.5rem;
+  color:#d0e8ff; font-family:var(--font); font-size:.82rem; outline:none;
+  transition:border-color .2s, box-shadow .2s;
+}
+.field input:focus { border-color:rgba(0,212,255,.28);
+  box-shadow:0 0 0 3px rgba(0,212,255,.07),0 0 18px rgba(0,212,255,.07); }
+.field input::placeholder { color:rgba(58,88,120,.8); }
+
+.btn-login {
+  width:100%; margin-top:.4rem;
+  background:linear-gradient(135deg,#00d4ff,#0080ff);
+  border:none; border-radius:7px; padding:.75rem;
+  font-family:var(--font); font-size:.78rem; font-weight:800;
+  text-transform:uppercase; letter-spacing:.12em; color:#000d18;
+  display:flex; align-items:center; justify-content:center; gap:.45rem;
+  cursor:pointer; transition:transform .15s, box-shadow .2s; position:relative; overflow:hidden;
+}
+.btn-login::before { content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.18),transparent);
+  opacity:0; transition:opacity .2s; }
+.btn-login:hover { transform:translateY(-1px); box-shadow:0 8px 26px rgba(0,212,255,.28); }
+.btn-login:hover::before { opacity:1; }
+.btn-login:active { transform:none; }
+.btn-login.loading { opacity:.65; pointer-events:none; }
+
+.screen-footer { margin-top:1.1rem; padding-top:.875rem;
+  border-top:1px solid rgba(255,255,255,.04);
+  display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.4rem; }
+.fbadge { display:inline-flex; align-items:center; gap:.28rem; padding:.18rem .6rem;
+  border-radius:999px; font-size:.58rem; font-weight:700; border:1px solid; }
+.fbadge-a { background:rgba(0,212,255,.08); color:var(--cy); border-color:rgba(0,212,255,.18); }
+.fbadge-o { background:rgba(0,128,255,.08); color:#4da6ff; border-color:rgba(0,128,255,.18); }
+.fbadge-v { background:rgba(124,58,237,.08); color:#a78bfa; border-color:rgba(124,58,237,.18); }
+
+/* ── OVERLAY ANIMACIÓN CABLE ── */
+#cable-overlay {
+  position:fixed; inset:0; z-index:100;
+  background:#000509;
+  display:none; flex-direction:column;
+  align-items:center; justify-content:center; gap:1.5rem;
+}
+#cable-canvas { display:block; max-width:100%; }
+.cable-msg {
+  font-family:var(--mono); font-size:.72rem;
+  color:var(--cy); letter-spacing:.22em; text-transform:uppercase;
+  opacity:0; transition:opacity .4s;
+}
+</style>
+</head>
+<body>
+
+<!-- FONDO: ONDAS COMPLETO -->
+<canvas id="wave-bg"></canvas>
+
+<div class="scene">
+  <div class="monitor">
+    <div class="bezel">
+      <div class="bezel-brand">AJFLUX · NET</div>
+      <div class="screw screw-tl"></div>
+      <div class="screw screw-tr"></div>
+      <div class="screen">
+        <div class="screen-inner">
+
+          <div class="brand-row">
+            <span class="brand">AJFLUX</span>
+            <span class="brand-ver">v3.0</span>
+          </div>
+          <div class="brand-sub">QoS Network Monitor</div>
+
+          {% if error %}
+          <div class="error-msg">
+            <span class="material-symbols-outlined" style="font-size:.9rem">error</span>
+            {{ error }}
+          </div>
+          {% endif %}
+          {% if request.GET.sin_permiso %}
+          <div class="error-msg">
+            <span class="material-symbols-outlined" style="font-size:.9rem">lock</span>
+            Sin permisos para acceder a esa sección.
+          </div>
+          {% endif %}
+
+          <form id="lform">
+            {% csrf_token %}
+            <div class="field">
+              <label>Usuario</label>
+              <div class="field-wrap">
+                <span class="material-symbols-outlined ficon">person</span>
+                <input type="text" name="username" id="fu" placeholder="Ingresa tu usuario"
+                  autofocus autocomplete="username" required/>
+              </div>
+            </div>
+            <div class="field">
+              <label>Contraseña</label>
+              <div class="field-wrap">
+                <span class="material-symbols-outlined ficon">lock</span>
+                <input type="password" name="password" id="fp" placeholder="Ingresa tu contraseña"
+                  autocomplete="current-password" required/>
+              </div>
+            </div>
+            <button type="submit" class="btn-login" id="btnl">
+              <span class="material-symbols-outlined" style="font-size:1rem">login</span>
+              <span id="btnl-txt">Iniciar Sesión</span>
+            </button>
+          </form>
+
+          <div class="screen-footer">
+            <span style="font-size:.55rem;color:#2a4060;font-family:var(--mono)">ACCESO</span>
+            <div style="display:flex;gap:.3rem">
+              <span class="fbadge fbadge-a"><span class="material-symbols-outlined" style="font-size:.65rem">admin_panel_settings</span>Admin</span>
+              <span class="fbadge fbadge-o"><span class="material-symbols-outlined" style="font-size:.65rem">engineering</span>Operador</span>
+              <span class="fbadge fbadge-v"><span class="material-symbols-outlined" style="font-size:.65rem">visibility</span>Viewer</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="bezel-strip">
+        <span class="pwr-btn"></span>
+        <span class="pwr-label">POWER · QOS MONITOR</span>
+      </div>
+    </div>
+    <div class="neck"></div>
+    <div class="base"></div>
+  </div>
+</div>
+
+<!-- OVERLAY CABLE -->
+<div id="cable-overlay">
+  <canvas id="cable-canvas" width="680" height="200"></canvas>
+  <div class="cable-msg" id="cable-msg">Conectando...</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// FONDO: ONDAS MULTICAPA — cubre toda la pantalla
+// ═══════════════════════════════════════════════
+(function() {
+  const cv  = document.getElementById('wave-bg');
+  const ctx = cv.getContext('2d');
+  let W, H, t = 0;
+
+  function resize() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+
+  // 5 capas de ondas: diferentes colores, amplitudes, frecuencias
+  const LAYERS = [
+    { color:'#00d4ff', amp:.06,  freq:.008, speed:.5,  phase:0,   alpha:.18, width:1.5 },
+    { color:'#0080ff', amp:.05,  freq:.011, speed:.8,  phase:2.1, alpha:.14, width:1.2 },
+    { color:'#7c3aed', amp:.04,  freq:.015, speed:.4,  phase:4.3, alpha:.12, width:1.0 },
+    { color:'#00e676', amp:.025, freq:.02,  speed:1.1, phase:1.5, alpha:.08, width:.8  },
+    { color:'#00d4ff', amp:.08,  freq:.005, speed:.25, phase:3.7, alpha:.07, width:2.0 },
+  ];
+
+  // Partículas flotantes (nodos de red)
+  let nodes = [];
+  function initNodes() {
+    nodes = [];
+    const n = Math.floor(W * H / 20000);
+    for (let i=0; i<n; i++) {
+      nodes.push({
+        x:Math.random()*W, y:Math.random()*H,
+        vx:(Math.random()-.5)*.15, vy:(Math.random()-.5)*.15,
+        r:Math.random()*1.8+.5,
+        p:Math.random()*Math.PI*2, ps:Math.random()*.012+.004
+      });
+    }
+  }
+
+  function draw() {
+    ctx.clearRect(0,0,W,H);
+    t += 0.012;
+
+    // Ondas de fondo (múltiples en todo el canvas)
+    for (const L of LAYERS) {
+      // Dibuja 2 copias verticalmente desplazadas para llenar la pantalla
+      for (let oy of [0, H * .33, H * .66]) {
+        ctx.beginPath();
+        for (let x = 0; x <= W; x += 3) {
+          const y = oy + H * L.amp * Math.sin(x * L.freq + t * L.speed + L.phase)
+                      + H * L.amp * .4 * Math.sin(x * L.freq * 2.1 + t * L.speed * .7 + L.phase + 1);
+          x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = L.color;
+        ctx.globalAlpha = L.alpha;
+        ctx.lineWidth   = L.width;
+        ctx.shadowColor = L.color;
+        ctx.shadowBlur  = 8;
+        ctx.stroke();
+        ctx.shadowBlur  = 0;
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // Nodos de red
+    const MAX_D = 120;
+    for (let i=0; i<nodes.length; i++) {
+      for (let j=i+1; j<nodes.length; j++) {
+        const dx=nodes[i].x-nodes[j].x, dy=nodes[i].y-nodes[j].y;
+        const d=Math.sqrt(dx*dx+dy*dy);
+        if (d<MAX_D) {
+          const a=(1-d/MAX_D)*.07;
+          ctx.beginPath();
+          ctx.strokeStyle=`rgba(0,180,255,${a})`;
+          ctx.lineWidth=.4;
+          ctx.moveTo(nodes[i].x,nodes[i].y);
+          ctx.lineTo(nodes[j].x,nodes[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+    for (const n of nodes) {
+      n.p+=n.ps;
+      const g=.5+.5*Math.sin(n.p);
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(0,212,255,${.12+.18*g})`;
+      ctx.fill();
+      n.x+=n.vx; n.y+=n.vy;
+      if(n.x<0||n.x>W)n.vx*=-1;
+      if(n.y<0||n.y>H)n.vy*=-1;
+    }
+
+    requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); initNodes(); });
+  resize(); initNodes(); draw();
+})();
+
+// ═══════════════════════════════════════════════
+// SUBMIT AJAX
+// ═══════════════════════════════════════════════
+const form   = document.getElementById('lform');
+const btn    = document.getElementById('btnl');
+const btnTxt = document.getElementById('btnl-txt');
+
+form.addEventListener('submit', async e => {
+  e.preventDefault();
+  btn.classList.add('loading');
+  btnTxt.textContent = 'Verificando...';
+
+  try {
+    const fd  = new FormData(form);
+    const res = await fetch('/login/', { method:'POST', body:fd, redirect:'manual' });
+    const ok  = res.type === 'opaqueredirect' || res.redirected || res.status === 302;
+
+    if (ok && res.status !== 200) {
+      const dest = (res.redirected && res.url)
+        ? res.url.replace(window.location.origin,'') : '/';
+      startCableAnim(() => { window.location.href = dest; });
+    } else {
+      window.location.href = '/login/?login_error=1';
+    }
+  } catch {
+    window.location.href = '/login/?login_error=1';
+  }
+});
+
+// ═══════════════════════════════════════════════
+// ANIMACIÓN DEL CABLE DE RED: PC → SERVIDOR
+// ═══════════════════════════════════════════════
+function startCableAnim(onDone) {
+  const overlay = document.getElementById('cable-overlay');
+  const cv      = document.getElementById('cable-canvas');
+  const ctx     = cv.getContext('2d');
+  const msg     = document.getElementById('cable-msg');
+
+  overlay.style.display = 'flex';
+  setTimeout(() => { msg.style.opacity = '1'; }, 300);
+
+  const CW = cv.width, CH = cv.height;
+
+  // Coordenadas de PC y Servidor
+  const PC  = { x: 80,      y: CH / 2 };
+  const SV  = { x: CW - 80, y: CH / 2 };
+
+  // El cable tiene una trayectoria fija con segmentos (como un cable UTP tendido)
+  // PC → doblamos hacia abajo → cruzamos horizontal → subimos al servidor
+  const CABLE = [
+    { x: PC.x + 30, y: PC.y },          // salida PC (puerto RJ45)
+    { x: PC.x + 60, y: PC.y + 35 },     // dobla baja
+    { x: CW * .38,  y: PC.y + 35 },     // segmento horizontal bajo
+    { x: CW * .38,  y: PC.y - 35 },     // sube
+    { x: CW * .62,  y: PC.y - 35 },     // cruza horizontal alto
+    { x: CW * .62,  y: PC.y + 20 },     // baja
+    { x: SV.x - 60, y: PC.y + 20 },     // acerca servidor
+    { x: SV.x - 30, y: SV.y },          // llega puerto
+  ];
+
+  // Calcular longitudes de segmentos
+  const SEGS = [];
+  let totalLen = 0;
+  for (let i = 0; i < CABLE.length - 1; i++) {
+    const dx = CABLE[i+1].x - CABLE[i].x;
+    const dy = CABLE[i+1].y - CABLE[i].y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    SEGS.push(len);
+    totalLen += len;
+  }
+
+  function getPosOnCable(d) {
+    // d = distancia desde inicio del cable [0, totalLen]
+    let remaining = d;
+    let seg = 0;
+    while (seg < SEGS.length - 1 && remaining > SEGS[seg]) {
+      remaining -= SEGS[seg]; seg++;
+    }
+    const t = Math.min(1, remaining / (SEGS[seg] || 1));
+    const p0 = CABLE[seg], p1 = CABLE[seg + 1] || CABLE[seg];
+    return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
+  }
+
+  let progress = 0;   // longitud del cable ya tendido [0..totalLen]
+  let phase    = 0;   // 0=tender cable, 1=señal viaja, 2=llegada
+  let tick     = 0;
+  let signalD  = 0;   // posición de la señal en el cable
+  let done     = false;
+
+  const MSGS = ['Tendiendo enlace...','Enviando señal...','Verificando paquetes...','ACCESO CONCEDIDO'];
+  let msgIdx = 0;
+  const msgTimer = setInterval(() => {
+    if (msgIdx < MSGS.length - 1) { msgIdx++; msg.textContent = MSGS[msgIdx]; }
+  }, 700);
+
+  // Dibujar icono PC/Servidor
+  function drawDevice(cx2, x, y, label, color, glow) {
+    const W2 = 44, H2 = 30;
+    cx2.save();
+    if (glow) { cx2.shadowColor = color; cx2.shadowBlur = 20; }
+    cx2.strokeStyle = color; cx2.lineWidth = glow ? 2 : 1.2;
+    cx2.fillStyle   = color + '18';
+    cx2.strokeRect(x - W2/2, y - H2/2, W2, H2);
+    cx2.fillRect(x - W2/2, y - H2/2, W2, H2);
+    cx2.shadowBlur  = 0;
+    cx2.fillStyle   = color;
+    cx2.font        = `700 10px 'JetBrains Mono', monospace`;
+    cx2.textAlign   = 'center'; cx2.textBaseline = 'middle';
+    cx2.fillText(label, x, y);
+    cx2.restore();
+  }
+
+  // Dibujar el cable hasta la distancia `upTo`
+  function drawCablePath(cx2, upTo, colorLine) {
+    cx2.save();
+    cx2.strokeStyle = colorLine || 'rgba(0,212,255,0.35)';
+    cx2.lineWidth   = 3;
+    cx2.lineCap     = 'round'; cx2.lineJoin = 'round';
+    cx2.beginPath();
+
+    let drawn = 0;
+    for (let i = 0; i < CABLE.length - 1; i++) {
+      const p0 = CABLE[i], p1 = CABLE[i + 1];
+      const segLen = SEGS[i];
+      if (drawn >= upTo) break;
+      const canDraw = Math.min(segLen, upTo - drawn);
+      const t = canDraw / segLen;
+      const ex = p0.x + (p1.x - p0.x) * t;
+      const ey = p0.y + (p1.y - p0.y) * t;
+      if (i === 0 && drawn === 0) ctx.moveTo(p0.x, p0.y);
+      else if (drawn === 0) ctx.moveTo(p0.x, p0.y);
+      cx2.moveTo(p0.x, p0.y);
+      cx2.lineTo(ex, ey);
+      drawn += canDraw;
+    }
+    cx2.stroke();
+    cx2.restore();
+  }
+
+  function frame() {
+    if (done) return;
+    tick++;
+
+    // Fondo
+    ctx.fillStyle = '#000509';
+    ctx.fillRect(0, 0, CW, CH);
+
+    // Grid
+    ctx.strokeStyle = 'rgba(0,212,255,.04)';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx <= CW; gx += 50) {
+      ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,CH); ctx.stroke();
+    }
+    for (let gy = 0; gy <= CH; gy += 50) {
+      ctx.beginPath(); ctx.moveTo(0,gy); ctx.lineTo(CW,gy); ctx.stroke();
+    }
+
+    if (phase === 0) {
+      // Tender el cable: progress crece
+      progress = Math.min(totalLen, progress + totalLen / 55);
+      drawCablePath(ctx, progress);
+
+      // Punta brillante
+      const tip = getPosOnCable(progress);
+      ctx.beginPath(); ctx.arc(tip.x, tip.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#00d4ff'; ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 18;
+      ctx.fill(); ctx.shadowBlur = 0;
+
+      if (progress >= totalLen) { phase = 1; signalD = 0; }
+    }
+
+    if (phase >= 1) {
+      // Cable completo visible
+      drawCablePath(ctx, totalLen, 'rgba(0,212,255,0.25)');
+    }
+
+    if (phase === 1) {
+      // Señal viajando: bola brillante recorre el cable
+      signalD = Math.min(totalLen, signalD + totalLen / 45);
+
+      // Estela de la señal
+      for (let i = 10; i >= 0; i--) {
+        const trailD = Math.max(0, signalD - i * (totalLen / 150));
+        const pt     = getPosOnCable(trailD);
+        const a      = (1 - i / 10) * 0.6;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, 3 + i * .2, 0, Math.PI * 2);
+        ctx.fillStyle   = `rgba(0,212,255,${a})`;
+        ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 10 - i;
+        ctx.fill(); ctx.shadowBlur = 0;
+      }
+
+      // Bola principal
+      const spt = getPosOnCable(signalD);
+      ctx.beginPath(); ctx.arc(spt.x, spt.y, 7, 0, Math.PI * 2);
+      ctx.fillStyle   = '#00d4ff';
+      ctx.shadowColor = '#00d4ff'; ctx.shadowBlur = 28;
+      ctx.fill(); ctx.shadowBlur = 0;
+
+      if (signalD >= totalLen) { phase = 2; tick = 0; }
+    }
+
+    if (phase === 2) {
+      // Flash en el servidor
+      const flashA = Math.max(0, 1 - tick / 35) * .35;
+      ctx.fillStyle = `rgba(0,230,118,${flashA})`;
+      ctx.fillRect(0, 0, CW, CH);
+    }
+
+    // PC y Servidor
+    drawDevice(ctx, PC.x, PC.y, 'PC',     '#00d4ff', true);
+    drawDevice(ctx, SV.x, SV.y, 'SERVER', phase >= 2 ? '#00e676' : '#0080ff', phase >= 2);
+
+    // Conector RJ45 PC (salida)
+    ctx.fillStyle = 'rgba(0,212,255,.5)';
+    ctx.fillRect(PC.x + 22, PC.y - 4, 8, 8);
+    // Conector RJ45 SV (entrada)
+    ctx.fillStyle = phase >= 2 ? 'rgba(0,230,118,.6)' : 'rgba(0,128,255,.5)';
+    ctx.fillRect(SV.x - 30, SV.y - 4, 8, 8);
+
+    if (phase === 2 && tick > 55) {
+      clearInterval(msgTimer);
+      msg.textContent = '✓ ACCESO CONCEDIDO';
+      msg.style.color = '#00e676';
+
+      overlay.style.transition = 'opacity .7s';
+      overlay.style.opacity = '0';
+      setTimeout(() => { done = true; onDone(); }, 750);
+      return;
+    }
+
+    requestAnimationFrame(frame);
+  }
+
+  requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>

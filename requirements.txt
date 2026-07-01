@@ -1,0 +1,6 @@
+Django>=4.2
+psutil>=5.9
+requests>=2.31
+reportlab>=4.0
+scapy>=2.5.0
+python-nmap>=0.7.1
