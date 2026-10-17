@@ -20,3 +20,9 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+#venv/bin/python3.9 manage.py runserver 0.0.0.0:8000
+
+#us: angel 
+#pass: Ajflux2026!

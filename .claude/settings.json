@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(disown)",
+      "Bash(sudo dnf install -y nmap)",
+      "Bash(sudo -n dnf install -y nmap)",
+      "Bash(sudo -n setcap cap_net_raw+eip /home/angel/Documentos/ajflux/venv/bin/python3.9)",
+      "Bash(getcap /home/angel/Documentos/ajflux/venv/bin/python3.9)",
+      "Read(//usr/bin/**)",
+      "Bash(rm python3.9)",
+      "Bash(cp --preserve=mode /usr/bin/python3.9 python3.9)",
+      "Bash(pkill -f \"manage.py runserver\")",
+      "Bash(nohup ./venv/bin/python3.9 manage.py runserver 127.0.0.1:8000)",
+      "Bash(timeout 6 ./venv/bin/python3.9 manage.py runserver 127.0.0.1:8000)",
+      "Bash(sudo -n setcap cap_net_raw,cap_net_admin+eip /usr/bin/nmap)",
+      "Bash(getcap /usr/bin/nmap)",
+      "Read(//usr/sbin/**)",
+      "Bash(sudo -n cat /etc/sudoers.d/ajflux-temp)",
+      "Bash(echo \"pkill exit: $?\")",
+      "Bash(ip -4 addr show)",
+      "Bash(ip route *)",
+      "Read(//etc/**)",
+      "Bash(curl -s http://127.0.0.1:8000/api/live/)",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}

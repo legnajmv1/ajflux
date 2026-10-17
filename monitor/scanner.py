@@ -499,13 +499,6 @@ def _parse_linux_ping(output: str) -> dict:
 # NMAP — python-nmap (puertos, servicios, SO)
 # ═══════════════════════════════════════════════════
 
-def _has_root() -> bool:
-    try:
-        return os.getuid() == 0
-    except AttributeError:
-        return False  # Windows
-
-
 def nmap_scan_device(ip: str) -> dict:
     """
     Analisis completo de un dispositivo con python-nmap.
@@ -522,9 +515,8 @@ def nmap_scan_device(ip: str) -> dict:
         result['ports'] = scan_ports_socket(ip)
         return result
 
-    root = _has_root()
     base_args = '-sV -T4 --host-timeout 10s'
-    os_args   = '-O --osscan-guess' if root else ''
+    os_args   = '-O --osscan-guess'
 
     try:
         nm = nmap_lib.PortScanner()

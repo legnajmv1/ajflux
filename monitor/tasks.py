@@ -2,8 +2,14 @@
 AJFLUX — Tareas de Monitoreo en Background
 ===========================================
 Ciclos internos:
-  - Ping rápido     : cada PING_INTERVAL segundos (dispositivos conocidos)
-  - Escaneo completo: cada AUTO_SCAN_INTERVAL segundos (escanea TODAS las interfaces en paralelo)
+  - Ping rápido     : cada PING_INTERVAL segundos (dispositivos conocidos) — mantiene
+                      el estado en vivo y dispara alertas, pero NO genera reportes.
+  - Escaneo completo: 2 veces al día (AUTO_SCAN_INTERVAL) — descubre todos los
+                      dispositivos de cada red y genera un reporte (ScanReport).
+  - Escaneo por anomalía: si el ping rápido detecta algo crítico (desconexión,
+                      latencia o pérdida crítica), se dispara un escaneo completo
+                      extra fuera de horario (respetando ANOMALY_SCAN_COOLDOWN
+                      para no saturar la red con escaneos repetidos).
 """
 import threading
 import time
@@ -23,11 +29,12 @@ _start_time     = 0
 # CONFIGURACIÓN
 # ══════════════════════════════════════════════════════════
 
-PING_INTERVAL        = 30    # segundos entre pings rápidos
-AUTO_SCAN_INTERVAL   = 180   # segundos entre escaneos completos
-DELETE_OFFLINE       = False # NO borrar offline — se limpian por antigüedad (ver below)
-OFFLINE_GRACE_HOURS  = 1     # horas sin verse antes de eliminar un dispositivo
-FIRST_SCAN_DELAY     = 10    # segundos antes del primer escaneo al arrancar
+PING_INTERVAL         = 30           # segundos entre pings rápidos
+AUTO_SCAN_INTERVAL    = 12 * 3600    # segundos entre escaneos completos — 2 veces al día
+ANOMALY_SCAN_COOLDOWN = 15 * 60      # mínimo entre escaneos disparados por anomalías críticas
+DELETE_OFFLINE        = False # NO borrar offline — se limpian por antigüedad (ver below)
+OFFLINE_GRACE_HOURS   = 1     # horas sin verse antes de eliminar un dispositivo
+FIRST_SCAN_DELAY      = 10    # segundos antes del primer escaneo al arrancar
 
 LATENCY_WARNING_MS = 150   # ms — estado warning
 LATENCY_ALERT_MS   = 200   # ms — alerta crítica
@@ -316,12 +323,19 @@ def run_scan(network=None, progress_callback=None) -> dict:
     }
 
 
-def quick_ping_cycle():
-    """Ping rápido a todos los dispositivos conocidos."""
+def quick_ping_cycle() -> bool:
+    """Ping rápido a todos los dispositivos conocidos.
+
+    Devuelve True si se detectó alguna anomalía crítica (desconexión, latencia
+    o pérdida crítica) durante este ciclo — se usa para disparar un escaneo
+    completo extra fuera del horario regular.
+    """
     from monitor.models import Device, MetricSnapshot, Alert
     from monitor.scanner import ping_host, get_mac_from_arp
     from django.utils import timezone
     import socket as _socket
+
+    anomaly_detected = False
 
     for device in Device.objects.filter(status__in=['online', 'warning']):
         try:
@@ -359,6 +373,7 @@ def quick_ping_cycle():
                 _a = Alert.objects.create(device=device, level='critical',
                     message=f"{device.ip} ({device.hostname}) se desconectó [{device.network}]")
                 _send_fcm(_a)
+                anomaly_detected = True
 
             if result['alive'] and new_status != 'offline':
                 lat  = result.get('latency') or 0
@@ -369,10 +384,12 @@ def quick_ping_cycle():
                     _a = Alert.objects.create(device=device, level='critical',
                         message=f"Latencia critica en {device.ip}: {lat:.0f}ms")
                     _send_fcm(_a)
+                    anomaly_detected = True
                 if loss and loss > device.get_loss_warning():
                     _a = Alert.objects.create(device=device, level='critical',
                         message=f"Perdida en {device.ip}: {loss:.1f}%")
                     _send_fcm(_a)
+                    anomaly_detected = True
                 if jit and jit > device.get_jitter_warning():
                     _a = Alert.objects.create(device=device, level='warning',
                         message=f"Jitter alto en {device.ip}: {jit:.1f}ms")
@@ -398,16 +415,19 @@ def quick_ping_cycle():
         except Exception as e:
             logger.error(f"[PING] Error en {device.ip}: {e}")
 
+    return anomaly_detected
+
 
 def monitor_loop():
     """Loop principal: alterna entre ping rápido y escaneo completo."""
     global _running
     logger.info(
         f"[MONITOR] Iniciado — Ping cada {PING_INTERVAL}s | "
-        f"Escaneo completo cada {AUTO_SCAN_INTERVAL}s ({AUTO_SCAN_INTERVAL // 60} min)"
+        f"Reportes automáticos cada {AUTO_SCAN_INTERVAL // 3600}h "
+        f"(2x/día) + al detectar anomalías críticas (cooldown {ANOMALY_SCAN_COOLDOWN // 60} min)"
     )
 
-    last_ping = last_auto_scan = 0
+    last_ping = last_auto_scan = last_anomaly_scan = 0
 
     while _running:
         now = time.time()
@@ -433,8 +453,18 @@ def monitor_loop():
 
         elif now - last_ping >= PING_INTERVAL:
             try:
-                quick_ping_cycle()
+                anomaly = quick_ping_cycle()
                 last_ping = now
+
+                if (anomaly
+                        and (now - last_auto_scan) >= ANOMALY_SCAN_COOLDOWN
+                        and (now - last_anomaly_scan) >= ANOMALY_SCAN_COOLDOWN):
+                    logger.info("[MONITOR] Anomalía crítica detectada — generando reporte extra...")
+                    try:
+                        run_scan()
+                        last_anomaly_scan = last_auto_scan = time.time()
+                    except Exception as e:
+                        logger.error(f"[MONITOR] Error en escaneo por anomalía: {e}")
             except Exception as e:
                 logger.error(f"[MONITOR] Error en ping cycle: {e}")
                 last_ping = now

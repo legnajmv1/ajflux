@@ -6,7 +6,7 @@
 
 {% block extra_css %}
 <style>
-/* Stat cards con borde animado */
+/* Stat cards */
 .stat-card {
   background: rgba(12, 20, 34, 0.85);
   border: 1px solid rgba(0,212,255,0.1);
@@ -17,6 +17,8 @@
   cursor: default;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .stat-card::after {
   content: '';
@@ -34,7 +36,6 @@
 }
 .stat-card:hover::after { opacity: 1; }
 
-/* Icono flotante */
 .stat-icon {
   width: 40px; height: 40px;
   border-radius: .625rem;
@@ -43,70 +44,137 @@
   font-size: 1.3rem;
 }
 
-/* Animación de conteo */
+.card-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+
 @keyframes countUp {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 .count-anim { animation: countUp .4s ease; }
 
-/* Panel QoS gauge */
-.qos-panel {
-  background: rgba(12,20,34,0.85);
-  border: 1px solid rgba(0,212,255,0.1);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  backdrop-filter: blur(12px);
-  position: relative;
-  overflow: hidden;
+/* Caja "qué significa" / "qué es esto" / "qué hago" */
+.explain-box {
+  margin-top: .75rem;
+  padding: .75rem .875rem;
+  background: rgba(0,0,0,0.18);
+  border: 1px solid var(--border);
+  border-radius: .625rem;
+  font-size: .74rem;
+  line-height: 1.5;
+  color: var(--on-surface-2);
 }
-
-/* Alertas panel */
-.alerts-panel {
-  background: rgba(12,20,34,0.85);
-  border: 1px solid rgba(0,212,255,0.1);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  backdrop-filter: blur(12px);
-  display: flex;
-  flex-direction: column;
-}
-
-/* Gráfico global */
-.chart-panel {
-  background: rgba(12,20,34,0.85);
-  border: 1px solid rgba(0,212,255,0.1);
-  border-radius: 1rem;
-  padding: 1.5rem;
-  backdrop-filter: blur(12px);
-}
-
-/* Pequeños stats bajo gauge */
-.mini-stat { text-align: center; }
-.mini-stat .val {
+.explain-box .explain-title {
+  display: block;
+  margin-bottom: .3rem;
+  font-size: .64rem;
   font-weight: 700;
-  font-size: .95rem;
-  font-family: var(--font-mono);
-  color: var(--on-surface);
-}
-.mini-stat .lbl {
-  font-size: .6rem;
   text-transform: uppercase;
   letter-spacing: .08em;
   color: var(--on-surface-3);
-  margin-top: 2px;
+}
+
+/* Barra de progreso simple (conectados ahora) */
+.simple-bar {
+  width: 100%; height: 6px; border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  overflow: hidden; margin-top: .625rem;
+}
+.simple-bar-fill { height: 100%; border-radius: 999px; transition: width .6s ease; }
+
+/* Barra tricolor QoS con marcador */
+.qos-scale { position: relative; margin-top: .75rem; }
+.qos-scale-bar {
+  height: 6px; border-radius: 999px; width: 100%;
+  background: linear-gradient(90deg, var(--red) 0%, var(--red) 50%, var(--amber) 50%, var(--amber) 70%, var(--green) 70%, var(--green) 100%);
+}
+.qos-scale-marker {
+  position: absolute; top: -3px; width: 2px; height: 12px;
+  background: #fff; border-radius: 2px; transform: translateX(-1px);
+  box-shadow: 0 0 6px rgba(255,255,255,0.8);
+  transition: left .6s ease;
+}
+.qos-scale-labels {
+  display: flex; justify-content: space-between;
+  font-size: .62rem; color: var(--on-surface-3); margin-top: .35rem;
+  font-family: var(--font-mono);
+}
+
+/* Chip de estado con punto de color */
+.status-dot-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: .68rem; font-weight: 700; white-space: nowrap;
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* Leyenda de colores (header) */
+.color-legend {
+  background: rgba(12,20,34,0.7);
+  border: 1px solid var(--border);
+  border-radius: .75rem;
+  padding: .625rem .875rem;
+  display: flex; flex-direction: column; gap: .4rem;
+  min-width: 230px;
+}
+.color-legend .legend-title {
+  font-size: .6rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--on-surface-3); margin-bottom: .1rem;
+}
+.color-legend .legend-row {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .68rem; color: var(--on-surface-2);
+}
+.color-legend .legend-row b { color: var(--on-surface); font-weight: 600; }
+
+/* Panel salud de red: gauge + texto */
+.health-top-row {
+  display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+}
+.health-explain { flex: 1; min-width: 180px; font-size: .78rem; color: var(--on-surface-2); line-height: 1.55; }
+.health-explain b { color: var(--on-surface); display: block; margin-bottom: .25rem; font-size: .85rem; }
+
+/* Filas de métricas con descripción */
+.metric-row {
+  padding: .875rem 0;
+  border-top: 1px solid var(--border);
+}
+.metric-row:first-of-type { border-top: 1px solid var(--border); margin-top: 1.25rem; }
+.metric-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.metric-row-head .m-name { font-size: .78rem; font-weight: 700; color: var(--on-surface); }
+.metric-row-head .m-value { font-family: var(--font-mono); font-weight: 800; font-size: 1.1rem; color: var(--on-surface); }
+.metric-row p { font-size: .72rem; color: var(--on-surface-3); margin: .3rem 0 0; line-height: 1.5; }
+.metric-row .m-ideal { font-size: .65rem; color: var(--on-surface-3); font-family: var(--font-mono); margin-top: .25rem; }
+
+/* Ver más alertas */
+.see-all-link {
+  display: inline-block; margin-top: .75rem; font-size: .72rem;
+  color: var(--primary); cursor: pointer; background: none; border: none; font-family: var(--font);
+}
+.see-all-link:hover { text-decoration: underline; }
+
+@media (max-width: 900px) {
+  .gauge-alerts-grid { grid-template-columns: 1fr !important; }
+}
+@media (max-width: 600px) {
+  .color-legend { min-width: 0; width: 100%; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header" style="align-items:flex-start">
   <div>
     <h2 style="font-size:1.5rem">Vista General</h2>
-    <p>Salud de la red en tiempo real — dispositivos detectados en tu red local.</p>
+    <p style="max-width:52ch">
+      Estado de tu red en tiempo real: cuántos equipos están conectados y qué tan bien funciona la conexión.
+    </p>
+  </div>
+  <div class="color-legend">
+    <div class="legend-title">Cómo leer los colores</div>
+    <div class="legend-row"><span class="status-dot" style="background:var(--green);box-shadow:0 0 6px var(--green)"></span> <b>Bueno</b> — todo normal</div>
+    <div class="legend-row"><span class="status-dot" style="background:var(--amber);box-shadow:0 0 6px var(--amber)"></span> <b>Atención</b> — conviene revisar</div>
+    <div class="legend-row"><span class="status-dot" style="background:var(--red);box-shadow:0 0 6px var(--red)"></span> <b>Crítico</b> — actuar ya</div>
   </div>
 </div>
 
@@ -117,9 +185,13 @@
     <div class="stat-icon" style="background:rgba(0,212,255,0.08);border:1px solid rgba(0,212,255,0.15)">
       <span class="material-symbols-outlined" style="color:var(--primary)">devices</span>
     </div>
-    <div class="label" style="margin-bottom:.5rem">Total Dispositivos</div>
+    <div class="label" style="margin-bottom:.5rem">Total de Dispositivos</div>
     <div class="stat-value glow-val" id="stat-total">—</div>
-    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-network">Ejecuta un escaneo</div>
+    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-network">equipos encontrados</div>
+    <div class="explain-box">
+      <span class="explain-title">Función</span>
+      Cuenta cuántos equipos hay conectados a tu red.
+    </div>
   </div>
 
   <div class="stat-card" style="--accent-color:linear-gradient(90deg,var(--green),#00a855)">
@@ -128,16 +200,33 @@
     </div>
     <div class="label" style="margin-bottom:.5rem">Conectados Ahora</div>
     <div class="stat-value" style="color:var(--green);text-shadow:0 0 20px rgba(0,230,118,0.4)" id="stat-online">—</div>
-    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-online-pct">— nodos activos</div>
+    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-online-pct">— de — en línea</div>
+    <div class="simple-bar"><div class="simple-bar-fill" id="online-bar-fill" style="width:0%;background:var(--green)"></div></div>
+    <div class="explain-box">
+      <span class="explain-title">Función</span>
+      Muestra cuántos de esos equipos están conectados en este momento.
+    </div>
   </div>
 
   <div class="stat-card" style="--accent-color:linear-gradient(90deg,var(--blue),var(--purple))">
-    <div class="stat-icon" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15)">
-      <span class="material-symbols-outlined" style="color:#a78bfa">speed</span>
+    <div class="card-header-row">
+      <div class="stat-icon" style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.15)">
+        <span class="material-symbols-outlined" style="color:#a78bfa">speed</span>
+      </div>
+      <span id="qos-status-chip" class="status-dot-chip" style="margin-top:.25rem"></span>
     </div>
-    <div class="label" style="margin-bottom:.5rem">Puntaje QoS Promedio</div>
+    <div class="label" style="margin-bottom:.5rem">Calidad de Conexión (QoS)</div>
     <div class="stat-value gradient-text" id="stat-qos">—</div>
-    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)" id="stat-qos-label">Calculando...</div>
+    <div style="margin-top:.375rem;font-size:.72rem;font-family:var(--font-mono);color:var(--on-surface-3)">/ 100</div>
+    <div class="qos-scale">
+      <div class="qos-scale-bar"></div>
+      <div class="qos-scale-marker" id="qos-marker" style="left:0%"></div>
+    </div>
+    <div class="qos-scale-labels"><span>0 Crítico</span><span>50 Atención</span><span>70-100 Bueno</span></div>
+    <div class="explain-box">
+      <span class="explain-title">Función</span>
+      Resume qué tan buena es la conexión, con una nota del 0 al 100.
+    </div>
   </div>
 
 </div>
@@ -145,51 +234,73 @@
 <!-- GAUGE + ALERTAS -->
 <div class="gauge-alerts-grid" style="display:grid;grid-template-columns:1fr 2fr;gap:1.25rem;margin-bottom:1.25rem">
 
-  <div class="qos-panel">
-    <div class="card-title" style="align-self:flex-start;margin-bottom:1rem">
+  <div class="qos-panel" style="background: rgba(12,20,34,0.85); border: 1px solid rgba(0,212,255,0.1); border-radius: 1rem; padding: 1.5rem; backdrop-filter: blur(12px);">
+    <div class="card-title" style="margin-bottom:1rem">
       <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">network_check</span>
-      Salud de Red
-    </div>
-    <div class="gauge-wrap" style="position:relative;width:160px;height:160px;margin:0 auto">
-      <svg viewBox="0 0 160 160" style="width:100%;height:100%;transform:rotate(-90deg)">
-        <circle cx="80" cy="80" r="62" fill="none" stroke="rgba(0,212,255,0.06)" stroke-width="14"/>
-        <circle id="gauge-circle" cx="80" cy="80" r="62" fill="none"
-          stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
-          stroke-dasharray="389.6" stroke-dashoffset="389.6"
-          style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"/>
-        <defs>
-          <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%"   stop-color="#00d4ff"/>
-            <stop offset="50%"  stop-color="#0080ff"/>
-            <stop offset="100%" stop-color="#7c3aed"/>
-          </linearGradient>
-        </defs>
-      </svg>
-      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
-        <span class="gauge-value" id="gauge-val">—</span>
-        <span class="gauge-label" id="gauge-label">CARGANDO</span>
-      </div>
-      <!-- Halo externo -->
-      <div style="position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(0,212,255,0.07);pointer-events:none"></div>
+      Salud de la Red
     </div>
 
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.75rem;margin-top:1.25rem;width:100%">
-      <div class="mini-stat">
-        <div class="lbl">Latencia</div>
-        <div class="val" id="avg-latency">—</div>
+    <div class="health-top-row">
+      <div class="gauge-wrap" style="position:relative;width:140px;height:140px;flex-shrink:0">
+        <svg viewBox="0 0 160 160" style="width:100%;height:100%;transform:rotate(-90deg)">
+          <circle cx="80" cy="80" r="62" fill="none" stroke="rgba(0,212,255,0.06)" stroke-width="14"/>
+          <circle id="gauge-circle" cx="80" cy="80" r="62" fill="none"
+            stroke="url(#gaugeGrad)" stroke-width="14" stroke-linecap="round"
+            stroke-dasharray="389.6" stroke-dashoffset="389.6"
+            style="transition:stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)"/>
+          <defs>
+            <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%"   stop-color="#00d4ff"/>
+              <stop offset="50%"  stop-color="#0080ff"/>
+              <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+          <span class="gauge-value" id="gauge-val">—</span>
+          <span class="gauge-label" id="gauge-label">CARGANDO</span>
+        </div>
+        <div style="position:absolute;inset:-8px;border-radius:50%;border:1px solid rgba(0,212,255,0.07);pointer-events:none"></div>
       </div>
-      <div class="mini-stat">
-        <div class="lbl">Jitter</div>
-        <div class="val" id="avg-jitter">—</div>
+
+      <div class="health-explain">
+        <b>Función</b>
+        Resume el estado general de la red combinando las tres medidas de abajo.
       </div>
-      <div class="mini-stat">
-        <div class="lbl">Pérdida</div>
-        <div class="val" id="avg-loss">—</div>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric-row-head">
+        <span class="m-name">Latencia</span>
+        <span class="m-value" id="avg-latency">—</span>
+        <span id="lat-status-chip" class="status-dot-chip"></span>
       </div>
+      <p>Mide cuánto tarda la información en ir y volver.</p>
+      <div class="m-ideal">Ideal: menos de 100 ms</div>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric-row-head">
+        <span class="m-name">Jitter (estabilidad)</span>
+        <span class="m-value" id="avg-jitter">—</span>
+        <span id="jit-status-chip" class="status-dot-chip"></span>
+      </div>
+      <p>Mide qué tan estable es la conexión de un momento a otro.</p>
+      <div class="m-ideal">Ideal: menos de 30 ms</div>
+    </div>
+
+    <div class="metric-row">
+      <div class="metric-row-head">
+        <span class="m-name">Pérdida de datos</span>
+        <span class="m-value" id="avg-loss">—</span>
+        <span id="loss-status-chip" class="status-dot-chip"></span>
+      </div>
+      <p>Mide cuánta información se pierde en el camino.</p>
+      <div class="m-ideal">Ideal: menos de 1%</div>
     </div>
   </div>
 
-  <div class="alerts-panel">
+  <div class="alerts-panel" style="background: rgba(12,20,34,0.85); border: 1px solid rgba(0,212,255,0.1); border-radius: 1rem; padding: 1.5rem; backdrop-filter: blur(12px); display:flex; flex-direction:column;">
     <div class="card-title" style="justify-content:space-between;margin-bottom:1rem">
       <span style="display:flex;align-items:center;gap:.5rem">
         <span class="material-symbols-outlined" style="font-size:1rem;color:var(--amber)">notifications_active</span>
@@ -198,46 +309,63 @@
       <span id="alert-badge"
         style="display:none;background:rgba(255,51,102,0.12);color:var(--red);border:1px solid rgba(255,51,102,0.25);font-size:.68rem;padding:2px 10px;border-radius:999px;font-weight:700;font-family:var(--font-mono)"></span>
     </div>
+
+    <div class="explain-box" style="margin-bottom:1rem;margin-top:0">
+      <span class="explain-title">Función</span>
+      Muestra avisos automáticos cuando algo cambia en la red, por ejemplo un equipo que se desconecta.
+    </div>
+
     <div id="alerts-list"
-      style="display:flex;flex-direction:column;gap:.5rem;max-height:240px;overflow-y:auto;flex:1">
+      style="display:flex;flex-direction:column;gap:.5rem;max-height:280px;overflow-y:auto;flex:1">
       <div style="text-align:center;padding:3rem 0;color:var(--on-surface-3)">
         <span class="material-symbols-outlined"
           style="display:block;font-size:2.5rem;opacity:.2;margin-bottom:.5rem">notifications_off</span>
         <span style="font-size:.8rem">Sin alertas activas</span>
       </div>
     </div>
+    <button type="button" class="see-all-link" id="alerts-see-all" style="display:none" onclick="toggleAllAlerts()">
+      Ver todas las alertas
+    </button>
   </div>
 
-</div>
-
-<!-- GRÁFICO GLOBAL -->
-<div class="chart-panel">
-  <div class="card-title" style="justify-content:space-between;margin-bottom:1rem">
-    <span style="display:flex;align-items:center;gap:.5rem">
-      <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">show_chart</span>
-      Latencia Promedio Global
-    </span>
-    <span id="global-avg-display"
-      style="font-family:var(--font-mono);color:var(--primary);font-weight:700;font-size:.9rem;
-        text-shadow:0 0 12px rgba(0,212,255,0.4)">—</span>
-  </div>
-  <div class="chart-wrap"><canvas id="overview-chart"></canvas></div>
 </div>
 
 {% endblock %}
 
 {% block extra_js %}
 <script>
-let globalHistory = Array(60).fill(null);
-let overviewChart = null;
+let allAlertsExpanded = false;
+let lastAlertsData = [];
 
-function initOverviewChart() {
-  overviewChart = makeLineChart(
-    'overview-chart',
-    Array(60).fill(''),
-    [chartDataset(globalHistory, '#00d4ff')],
-    'ms'
-  );
+// Métricas donde subir es peor (latencia, jitter, pérdida): bad si >= crit, warn si >= warn.
+function statusLevelHigherWorse(value, warn, crit) {
+  if (value == null) return 'muted';
+  if (value >= crit) return 'bad';
+  if (value >= warn) return 'warn';
+  return 'good';
+}
+
+// Métricas donde subir es mejor (QoS): bad si < warnFloor, warn si < goodFloor.
+function statusLevelLowerWorse(value, warnFloor, goodFloor) {
+  if (value == null) return 'muted';
+  if (value < warnFloor) return 'bad';
+  if (value < goodFloor) return 'warn';
+  return 'good';
+}
+
+const STATUS_META = {
+  good:  ['var(--green)', 'Bueno'],
+  warn:  ['var(--amber)', 'Atención'],
+  bad:   ['var(--red)', 'Crítico'],
+  muted: ['var(--on-surface-3)', '—'],
+};
+
+function setStatusChip(id, level) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const [color, label] = STATUS_META[level] || STATUS_META.muted;
+  el.style.color = color;
+  el.innerHTML = `<span class="status-dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>${label}`;
 }
 
 document.addEventListener('ajflux:devices', e => {
@@ -255,24 +383,32 @@ document.addEventListener('ajflux:devices', e => {
   setAnimVal('stat-total',  total  || '—');
   setAnimVal('stat-online', active || '—');
   document.getElementById('stat-online-pct').textContent =
-    total ? `${Math.round(active/total*100)}% nodos activos` : '—';
-  setAnimVal('stat-qos', avgQos != null ? avgQos : '—');
-  document.getElementById('avg-latency').textContent = avgLat  != null ? avgLat.toFixed(0)+'ms'  : '—';
-  document.getElementById('avg-jitter').textContent  = avgJit  != null ? avgJit.toFixed(1)+'ms'  : '—';
-  document.getElementById('avg-loss').textContent    = avgLoss != null ? avgLoss.toFixed(1)+'%'  : '—';
-  document.getElementById('global-avg-display').textContent = avgLat != null ? avgLat.toFixed(0)+'ms' : '—';
+    total ? `${active} de ${total} en línea` : '— de — en línea';
+  document.getElementById('online-bar-fill').style.width = total ? `${Math.round(active/total*100)}%` : '0%';
 
-  const lbl = !avgQos ? 'CARGANDO' : avgQos>=90?'EXCELENTE':avgQos>=70?'BUENO':avgQos>=50?'REGULAR':'CRÍTICO';
-  document.getElementById('stat-qos-label').textContent = avgQos != null ? lbl : 'Calculando...';
-  document.getElementById('gauge-label').textContent    = lbl;
-  document.getElementById('gauge-val').textContent      = avgQos != null ? avgQos : '—';
+  setAnimVal('stat-qos', avgQos != null ? avgQos : '—');
+  document.getElementById('avg-latency').textContent = avgLat  != null ? avgLat.toFixed(0)+' ms' : '—';
+  document.getElementById('avg-jitter').textContent  = avgJit  != null ? avgJit.toFixed(1)+' ms' : '—';
+  document.getElementById('avg-loss').textContent    = avgLoss != null ? avgLoss.toFixed(1)+'%'  : '—';
+
+  const qosLevel  = statusLevelLowerWorse(avgQos, 60, 80);
+  const latLevel  = statusLevelHigherWorse(avgLat, 150, 200);
+  const jitLevel  = statusLevelHigherWorse(avgJit, 30, 60);
+  const lossLevel = statusLevelHigherWorse(avgLoss, 1, 5);
+
+  setStatusChip('qos-status-chip', qosLevel);
+  setStatusChip('lat-status-chip', latLevel);
+  setStatusChip('jit-status-chip', jitLevel);
+  setStatusChip('loss-status-chip', lossLevel);
+
+  document.getElementById('qos-marker').style.left = avgQos != null ? `${Math.min(100, Math.max(0, avgQos))}%` : '0%';
+
+  const lbl = !avgQos ? 'CARGANDO' : (STATUS_META[qosLevel][1] || '—').toUpperCase();
+  document.getElementById('gauge-label').textContent = lbl;
+  document.getElementById('gauge-val').textContent   = avgQos != null ? avgQos : '—';
 
   if (avgQos != null) {
     document.getElementById('gauge-circle').setAttribute('stroke-dashoffset', 389.6 - 389.6 * avgQos / 100);
-  }
-  if (avgLat != null) {
-    globalHistory.push(+avgLat.toFixed(1)); globalHistory.shift();
-    if (overviewChart) { overviewChart.data.datasets[0].data = [...globalHistory]; overviewChart.update('none'); }
   }
 });
 
@@ -286,9 +422,15 @@ function setAnimVal(id, val) {
 }
 
 document.addEventListener('ajflux:alerts', e => {
-  const alerts = e.detail;
+  lastAlertsData = e.detail;
+  renderAlerts();
+});
+
+function renderAlerts() {
+  const alerts = lastAlertsData;
   const list   = document.getElementById('alerts-list');
   const badge  = document.getElementById('alert-badge');
+  const seeAll = document.getElementById('alerts-see-all');
 
   if (!alerts.length) {
     list.innerHTML = `<div style="text-align:center;padding:3rem 0;color:var(--on-surface-3)">
@@ -296,16 +438,18 @@ document.addEventListener('ajflux:alerts', e => {
       <span style="font-size:.8rem">Sin alertas activas</span>
     </div>`;
     badge.style.display = 'none';
+    seeAll.style.display = 'none';
     return;
   }
 
   badge.textContent = alerts.length;
   badge.style.display = 'inline';
 
+  const limit = allAlertsExpanded ? alerts.length : 4;
   const icons  = { critical:'error', warning:'warning', info:'info' };
   const colors = { critical:'var(--red)', warning:'var(--amber)', info:'var(--primary)' };
 
-  list.innerHTML = alerts.slice(0, 8).map(a => `
+  list.innerHTML = alerts.slice(0, limit).map(a => `
     <div class="alert-item alert-${a.level} slide-in">
       <span class="material-symbols-outlined" style="color:${colors[a.level]||'var(--primary)'};font-size:1.1rem;flex-shrink:0">${icons[a.level]||'info'}</span>
       <div style="flex:1;min-width:0">
@@ -319,7 +463,19 @@ document.addEventListener('ajflux:alerts', e => {
         <span class="material-symbols-outlined" style="font-size:1rem">close</span>
       </button>
     </div>`).join('');
-});
+
+  if (alerts.length > 4) {
+    seeAll.style.display = 'inline-block';
+    seeAll.textContent = allAlertsExpanded ? 'Ver menos' : `Ver las ${alerts.length} alertas`;
+  } else {
+    seeAll.style.display = 'none';
+  }
+}
+
+function toggleAllAlerts() {
+  allAlertsExpanded = !allAlertsExpanded;
+  renderAlerts();
+}
 
 function resolveAlert(id) {
   fetch(`/api/alertas/${id}/resolver/`, { method: 'POST' })
@@ -329,6 +485,19 @@ function resolveAlert(id) {
     });
 }
 
-document.addEventListener('DOMContentLoaded', initOverviewChart);
+// Último escaneo
+function loadScanInfo() {
+  fetch('/api/monitor/estado/')
+    .then(r => r.json())
+    .then(d => {
+      const el = document.getElementById('stat-network');
+      if (!el) return;
+      el.textContent = d.last_scan
+        ? `Último escaneo: ${new Date(d.last_scan).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}`
+        : 'Aún no se ha escaneado';
+    }).catch(() => {});
+}
+document.addEventListener('DOMContentLoaded', loadScanInfo);
+document.addEventListener('ajflux:scan_complete', loadScanInfo);
 </script>
 {% endblock %}

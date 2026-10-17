@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'ajflux-qos-monitor-secret-key-change-in-production'
 
-DEBUG = True
+DEBUG = os.environ.get('DJANGO_DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['*']
 
@@ -23,9 +23,11 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'monitor.middleware.TokenAuthMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
 ]
 
@@ -62,6 +64,7 @@ USE_TZ        = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+WHITENOISE_USE_FINDERS = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

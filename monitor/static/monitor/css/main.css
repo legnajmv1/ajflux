@@ -789,6 +789,39 @@ input[type=range]::-webkit-slider-thumb {
   color: var(--red);
 }
 
+/* ── Modal genérico reutilizable (cualquier página) ──
+   Mismo patrón visual que #device-modal/.modal-box, pero como
+   clases genéricas para que otras páginas (ej. usuarios.html)
+   puedan abrir sus propios modales como ventana flotante real,
+   en vez de que el bloque quede inline empujando la página. */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(3, 6, 9, 0.85);
+  backdrop-filter: blur(16px);
+  z-index: 8000;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.modal {
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-xl);
+  width: 100%; max-width: 540px;
+  box-shadow: var(--shadow-lg), 0 0 60px rgba(0,212,255,0.08);
+  max-height: 90vh;
+  overflow-y: auto;
+  margin: auto;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: .625rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
 /* ── Page header ── */
 .page-header {
   display: flex;
@@ -1142,7 +1175,8 @@ input[type=range]::-webkit-slider-thumb {
   .sidebar        { background: #060c14 !important; }
   .topbar         { background: rgba(6, 12, 20, 0.98) !important; }
   .card           { background: rgba(10, 18, 30, 0.98) !important; }
-  .modal-box      { background: #0a121e !important; }
+  .modal-box,
+  .modal          { background: #0a121e !important; }
   #scan-overlay   { background: rgba(3, 6, 9, 0.97) !important; }
 
   /* Canvas animado: más tenue en móvil para no distraer */
