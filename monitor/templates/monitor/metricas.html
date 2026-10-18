@@ -13,7 +13,7 @@
   gap: .5rem;
   margin-bottom: 1.5rem;
   padding: 1rem 1.25rem;
-  background: rgba(10,18,30,0.85);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   backdrop-filter: blur(12px);
@@ -55,7 +55,7 @@
 
 /* Cards de métricas */
 .metric-card {
-  background: rgba(10,18,30,0.85);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 1.25rem;
@@ -78,7 +78,7 @@
 
 /* Tabla métricas */
 .metrics-summary-wrap {
-  background: rgba(10,18,30,0.85);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -98,44 +98,44 @@
 
 <!-- SELECTOR DE DISPOSITIVO -->
 <div class="device-selector" id="metric-device-btns">
-  <span style="font-size:.68rem;color:var(--on-surface-3);align-self:center;margin-right:.25rem;font-family:var(--font-mono)">DISPOSITIVO:</span>
+  <span style="font-size:.72rem;color:var(--on-surface-3);align-self:center;margin-right:.25rem;font-family:var(--font-mono)">DISPOSITIVO:</span>
 </div>
 
 <!-- GRÁFICOS 2x2 -->
 <div class="grid-2" style="margin-bottom:.25rem">
 
-  <div class="metric-card" style="--line-color: #00d4ff">
+  <div class="metric-card" style="--line-color: var(--primary)">
     <div class="card-title" style="margin-bottom:1rem">
-      <span class="material-symbols-outlined" style="color:#00d4ff">network_ping</span>
+      <span class="material-symbols-outlined" style="color:var(--primary)">network_ping</span>
       Latencia
-      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#00d4ff" id="cur-latency">— ms</span>
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:var(--primary)" id="cur-latency">— ms</span>
     </div>
     <div class="chart-wrap"><canvas id="chart-latency"></canvas></div>
   </div>
 
-  <div class="metric-card" style="--line-color: #ffab00">
+  <div class="metric-card" style="--line-color: var(--amber)">
     <div class="card-title" style="margin-bottom:1rem">
-      <span class="material-symbols-outlined" style="color:#ffab00">ssid_chart</span>
+      <span class="material-symbols-outlined" style="color:var(--amber)">ssid_chart</span>
       Jitter
-      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#ffab00" id="cur-jitter">— ms</span>
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:var(--amber)" id="cur-jitter">— ms</span>
     </div>
     <div class="chart-wrap"><canvas id="chart-jitter"></canvas></div>
   </div>
 
-  <div class="metric-card" style="--line-color: #ff3366">
+  <div class="metric-card" style="--line-color: var(--red)">
     <div class="card-title" style="margin-bottom:1rem">
-      <span class="material-symbols-outlined" style="color:#ff3366">signal_wifi_bad</span>
+      <span class="material-symbols-outlined" style="color:var(--red)">signal_wifi_bad</span>
       Paquetes Perdidos
-      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#ff3366" id="cur-loss">— %</span>
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:var(--red)" id="cur-loss">— %</span>
     </div>
     <div class="chart-wrap"><canvas id="chart-loss"></canvas></div>
   </div>
 
-  <div class="metric-card" style="--line-color: #00e676">
+  <div class="metric-card" style="--line-color: var(--green)">
     <div class="card-title" style="margin-bottom:1rem">
-      <span class="material-symbols-outlined" style="color:#00e676">speed</span>
+      <span class="material-symbols-outlined" style="color:var(--green)">speed</span>
       Puntaje QoS
-      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:#00e676" id="cur-qos">— %</span>
+      <span style="margin-left:auto;font-family:var(--font-mono);font-size:.78rem;color:var(--green)" id="cur-qos">— %</span>
     </div>
     <div class="chart-wrap"><canvas id="chart-qos"></canvas></div>
   </div>
@@ -146,7 +146,7 @@
 <div class="metrics-summary-wrap">
   <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:.5rem">
     <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">summarize</span>
-    <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Resumen por Dispositivo</span>
+    <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Resumen por Dispositivo</span>
   </div>
   <table>
     <thead>
@@ -175,7 +175,7 @@ function renderMetricBtns() {
   const statusColor = s => s === 'online' ? 'var(--green)' : s === 'warning' ? 'var(--amber)' : 'var(--red)';
 
   wrap.innerHTML =
-    `<span style="font-size:.68rem;color:var(--on-surface-3);align-self:center;margin-right:.25rem;font-family:var(--font-mono)">DISPOSITIVO:</span>` +
+    `<span style="font-size:.72rem;color:var(--on-surface-3);align-self:center;margin-right:.25rem;font-family:var(--font-mono)">DISPOSITIVO:</span>` +
     `<button class="device-btn active" id="mb-all" onclick="selectMetricDevice(null)">
       <span class="dot" style="background:var(--primary)"></span>
       Todos

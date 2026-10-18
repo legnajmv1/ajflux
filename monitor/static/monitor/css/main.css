@@ -42,6 +42,76 @@
 
   --shadow:    0 4px 30px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 8px 60px rgba(0, 0, 0, 0.7);
+
+  /* Colores que antes estaban fijos en las plantillas */
+  --nav-bg:       rgba(6, 12, 20, 0.95);
+  --overlay:      rgba(3, 6, 9, 0.88);
+  --on-primary:   #000d1a;
+  --violet:       #a78bfa;
+  --sky:          #60a5fa;
+  --red-2:        #ff6680;
+  --green-2:      #4ade80;
+
+  /* Gráficos (Chart.js) y canvas de fondo */
+  --chart-grid:   rgba(0, 212, 255, 0.04);
+  --chart-tick:   #3a5070;
+  --chart-legend: #6a90b8;
+  --canvas-rgb:   0, 212, 255;
+  --canvas-opacity: 0.4;
+
+  color-scheme: dark;
+}
+
+/* ── Tema claro ──
+   Mismos colores de estado (verde/ámbar/rojo) pero más oscuros para que
+   tengan contraste sobre fondo blanco, igual que en la app móvil. */
+:root[data-theme="light"] {
+  --bg:           #f2f6fb;
+  --bg-1:         #ffffff;
+  --bg-2:         #f7fafd;
+  --bg-3:         #e8eff7;
+  --surface:      rgba(255, 255, 255, 0.92);
+  --surface-2:    rgba(255, 255, 255, 0.98);
+  --surface-card: rgba(255, 255, 255, 0.9);
+
+  --primary:      #0077a8;
+  --primary-dim:  rgba(0, 119, 168, 0.08);
+  --primary-mid:  rgba(0, 119, 168, 0.16);
+  --primary-glow: 0 0 16px rgba(0, 119, 168, 0.18);
+  --primary-text: #0077a8;
+
+  --blue:         #0062cc;
+  --purple:       #6d28d9;
+  --green:        #0a8f4a;
+  --amber:        #b36b00;
+  --red:          #d61f4f;
+
+  --on-surface:   #0c1e2e;
+  --on-surface-2: #3d566e;
+  --on-surface-3: #5f7487;
+
+  --border:       rgba(0, 90, 140, 0.16);
+  --border-2:     rgba(0, 90, 140, 0.28);
+
+  --shadow:    0 4px 20px rgba(15, 40, 70, 0.08);
+  --shadow-lg: 0 8px 40px rgba(15, 40, 70, 0.14);
+
+  --nav-bg:       rgba(255, 255, 255, 0.96);
+  --overlay:      rgba(220, 230, 242, 0.85);
+  --on-primary:   #ffffff;
+  --violet:       #6d28d9;
+  --sky:          #1d64c8;
+  --red-2:        #c2185b;
+  --green-2:      #15803d;
+
+  --chart-grid:   rgba(12, 30, 46, 0.08);
+  --chart-tick:   #5f7487;
+  --chart-legend: #3d566e;
+  --canvas-rgb:   0, 119, 168;
+  --canvas-opacity: 0.25;
+  --explain-bg:   rgba(0, 90, 140, 0.05);
+
+  color-scheme: light;
 }
 
 /* ── Reset ── */
@@ -53,7 +123,7 @@ html, body {
   color: var(--on-surface);
   min-height: 100vh;
   overflow-x: hidden;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
@@ -69,7 +139,7 @@ html, body {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.4;
+  opacity: var(--canvas-opacity);
 }
 
 /* ── Tipografía ── */
@@ -81,7 +151,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
 .mono { font-family: var(--font-mono); }
 
 .label {
-  font-size: 0.65rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -130,7 +200,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
   width: 260px;
   height: 100%;
   z-index: 40;
-  background: rgba(6, 12, 20, 0.95);
+  background: var(--nav-bg);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -167,7 +237,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
   font-size: 1.6rem;
   font-weight: 900;
   letter-spacing: -0.06em;
-  background: linear-gradient(135deg, #00d4ff 0%, #0080ff 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--blue) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -175,7 +245,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
 }
 
 .brand-sub {
-  font-size: 0.6rem;
+  font-size: .72rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -265,8 +335,8 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
   flex-shrink: 0;
 }
 
-.badge-title { font-size: 0.7rem; font-weight: 700; color: var(--on-surface); }
-.badge-value { font-size: 0.68rem; font-family: var(--font-mono); }
+.badge-title { font-size: .72rem; font-weight: 700; color: var(--on-surface); }
+.badge-value { font-size: .72rem; font-family: var(--font-mono); }
 
 .sidebar-user {
   border-top: 1px solid var(--border);
@@ -279,7 +349,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
 .user-avatar {
   width: 34px; height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0080ff, #7c3aed);
+  background: linear-gradient(135deg, var(--blue), var(--purple));
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 0.8rem;
   color: #fff;
@@ -296,7 +366,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
   align-items: center;
   justify-content: space-between;
   padding: 0 1.5rem;
-  background: rgba(6, 12, 20, 0.85);
+  background: var(--nav-bg);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
 }
@@ -305,7 +375,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
 .topbar-right { display: flex; align-items: center; gap: 0.875rem; }
 
 .page-title {
-  font-size: 0.65rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.14em;
@@ -367,7 +437,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
 }
 
 .card-title {
-  font-size: 0.65rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -413,7 +483,7 @@ p  { color: var(--on-surface-2); font-size: 0.875rem; }
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 0.65rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -456,7 +526,7 @@ thead tr { border-bottom: 1px solid var(--border); }
 thead th {
   padding: 0.875rem 1.25rem;
   text-align: left;
-  font-size: 0.62rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -509,7 +579,7 @@ tbody td.mono  { font-family: var(--font-mono); font-size: 0.8rem; }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--primary), var(--blue));
-  color: #000d1a;
+  color: var(--on-primary);
   border-color: rgba(0,212,255,0.3);
 }
 .btn-primary:hover {
@@ -625,7 +695,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .gauge-label {
-  font-size: 0.6rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -665,12 +735,12 @@ input[type=range]::-webkit-slider-thumb {
 .alert-info     .material-symbols-outlined { color: var(--primary); }
 
 .alert-msg  { font-size: 0.84rem; color: var(--on-surface); }
-.alert-meta { font-size: 0.68rem; color: var(--on-surface-3); margin-top: 2px; font-family: var(--font-mono); }
+.alert-meta { font-size: .72rem; color: var(--on-surface-3); margin-top: 2px; font-family: var(--font-mono); }
 
 /* ── Overlay escaneo ── */
 #scan-overlay {
   position: fixed; inset: 0;
-  background: rgba(3, 6, 9, 0.92);
+  background: var(--overlay);
   backdrop-filter: blur(12px);
   z-index: 9999;
   display: none;
@@ -742,7 +812,7 @@ input[type=range]::-webkit-slider-thumb {
 /* ── Modal dispositivo ── */
 #device-modal {
   position: fixed; inset: 0;
-  background: rgba(3, 6, 9, 0.85);
+  background: var(--overlay);
   backdrop-filter: blur(16px);
   z-index: 8000;
   display: none;
@@ -796,7 +866,7 @@ input[type=range]::-webkit-slider-thumb {
    en vez de que el bloque quede inline empujando la página. */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(3, 6, 9, 0.85);
+  background: var(--overlay);
   backdrop-filter: blur(16px);
   z-index: 8000;
   align-items: center;
@@ -911,7 +981,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .topo-info-item .topo-info-label {
-  font-size: 0.62rem;
+  font-size: .72rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -950,7 +1020,7 @@ input[type=range]::-webkit-slider-thumb {
 
 .report-stat { text-align: center; }
 .report-stat .rs-val   { font-weight: 700; color: var(--on-surface); font-family: var(--font-mono); }
-.report-stat .rs-label { font-size: 0.65rem; color: var(--on-surface-3); }
+.report-stat .rs-label { font-size: .72rem; color: var(--on-surface-3); }
 
 /* ── Glowing border card ── */
 .card-glow {
@@ -984,9 +1054,9 @@ input[type=range]::-webkit-slider-thumb {
   background: rgba(0,128,255,0.08);
   border: 1px solid rgba(0,128,255,0.2);
   border-radius: 999px;
-  font-size: 0.68rem;
+  font-size: .72rem;
   font-weight: 700;
-  color: #4da6ff;
+  color: var(--sky);
   font-family: var(--font-mono);
 }
 
@@ -1059,7 +1129,7 @@ input[type=range]::-webkit-slider-thumb {
 
   /* Selector de dispositivos en Métricas */
   .device-selector { gap: 0.35rem; padding: 0.75rem; }
-  .device-btn { font-size: 0.65rem; padding: 0.3rem 0.75rem; }
+  .device-btn { font-size: .72rem; padding: 0.3rem 0.75rem; }
 
   /* Topología: canvas más corto en móvil */
   #topology-container { height: 360px; min-height: 260px; }
@@ -1087,7 +1157,7 @@ input[type=range]::-webkit-slider-thumb {
     bottom: 0; left: 0; right: 0;
     height: 60px;
     z-index: 50;
-    background: #060c14;
+    background: var(--bg-1);
     border-top: 1px solid rgba(0, 212, 255, 0.15);
     align-items: stretch;
   }
@@ -1101,7 +1171,7 @@ input[type=range]::-webkit-slider-thumb {
     gap: 2px;
     color: var(--on-surface-3);
     text-decoration: none;
-    font-size: 0.58rem;
+    font-size: .72rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -1172,12 +1242,12 @@ input[type=range]::-webkit-slider-thumb {
   }
 
   /* Fondos opacos para compensar el blur eliminado */
-  .sidebar        { background: #060c14 !important; }
-  .topbar         { background: rgba(6, 12, 20, 0.98) !important; }
-  .card           { background: rgba(10, 18, 30, 0.98) !important; }
+  .sidebar        { background: var(--bg-1) !important; }
+  .topbar         { background: var(--nav-bg) !important; }
+  .card           { background: var(--surface) !important; }
   .modal-box,
-  .modal          { background: #0a121e !important; }
-  #scan-overlay   { background: rgba(3, 6, 9, 0.97) !important; }
+  .modal          { background: var(--bg-2) !important; }
+  #scan-overlay   { background: var(--overlay) !important; }
 
   /* Canvas animado: más tenue en móvil para no distraer */
   #net-canvas { opacity: 0.12; }
@@ -1194,3 +1264,12 @@ input[type=range]::-webkit-slider-thumb {
 @media (max-width: 1024px) {
   .hide-md { display: none !important; }
 }
+
+/* ── Botón de tema (claro/oscuro) ── */
+.theme-toggle .theme-icon-light { display: none; }
+:root[data-theme="light"] .theme-toggle .theme-icon-light { display: inline; }
+:root[data-theme="light"] .theme-toggle .theme-icon-dark  { display: none; }
+
+/* En tema claro los textos con degradado/brillo pierden el resplandor */
+:root[data-theme="light"] .brand { filter: none; }
+:root[data-theme="light"] #sidebar-backdrop { background: rgba(12, 30, 46, 0.35); }

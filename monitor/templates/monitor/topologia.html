@@ -19,11 +19,11 @@
   letter-spacing: .08em;
   border: 1px solid;
 }
-.topo-estrella   { background:rgba(0,212,255,.1);   color:#00d4ff;  border-color:rgba(0,212,255,.3);  }
-.topo-arbol      { background:rgba(0,230,118,.1);   color:#00e676;  border-color:rgba(0,230,118,.3);  }
-.topo-malla      { background:rgba(255,171,0,.1);   color:#ffab00;  border-color:rgba(255,171,0,.3);  }
-.topo-hibrida    { background:rgba(124,58,237,.1);  color:#a78bfa;  border-color:rgba(124,58,237,.3); }
-.topo-lineal     { background:rgba(255,51,102,.1);  color:#ff6680;  border-color:rgba(255,51,102,.3); }
+.topo-estrella   { background:rgba(0,212,255,.1);   color:var(--primary);  border-color:rgba(0,212,255,.3);  }
+.topo-arbol      { background:rgba(0,230,118,.1);   color:var(--green);  border-color:rgba(0,230,118,.3);  }
+.topo-malla      { background:rgba(255,171,0,.1);   color:var(--amber);  border-color:rgba(255,171,0,.3);  }
+.topo-hibrida    { background:rgba(124,58,237,.1);  color:var(--violet);  border-color:rgba(124,58,237,.3); }
+.topo-lineal     { background:rgba(255,51,102,.1);  color:var(--red-2);  border-color:rgba(255,51,102,.3); }
 .topo-desconocida{ background:rgba(100,120,140,.1); color:#8aa0b8;  border-color:rgba(100,120,140,.3);}
 
 /* Barra de confianza */
@@ -32,7 +32,7 @@
 
 /* Panel de análisis */
 .analysis-panel {
-  background: rgba(10,18,30,0.9);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 1.25rem 1.5rem;
@@ -70,7 +70,7 @@
 
 /* Contenedor mapa */
 #topology-container {
-  background: rgba(6,12,20,0.95) !important;
+  background: var(--nav-bg) !important;
   border: 1px solid var(--border) !important;
   border-radius: var(--r-lg) !important;
   height: 560px;
@@ -94,7 +94,7 @@
 /* Panel info clic */
 .topo-info-panel {
   margin-top: 1rem;
-  background: rgba(10,18,30,0.9);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 1.25rem 1.5rem;
@@ -112,7 +112,7 @@
   margin-top: 1rem;
 }
 .topo-info-item .topo-info-label {
-  font-size: .6rem; font-weight:700; text-transform:uppercase;
+  font-size: .72rem; font-weight:700; text-transform:uppercase;
   letter-spacing:.08em; color:var(--on-surface-3);
 }
 .topo-info-item .topo-info-val {
@@ -148,7 +148,7 @@
 <div class="analysis-panel" id="topo-analysis-card">
   <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;margin-bottom:1rem">
     <div>
-      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.625rem;display:flex;align-items:center;gap:.375rem">
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.625rem;display:flex;align-items:center;gap:.375rem">
         <span class="material-symbols-outlined" style="font-size:.9rem">hub</span>
         Tipo de Topología Detectada
       </div>
@@ -158,7 +158,7 @@
           Sin analizar
         </span>
         <div>
-          <div style="font-size:.68rem;color:var(--on-surface-3);margin-bottom:.25rem">Confianza del análisis</div>
+          <div style="font-size:.72rem;color:var(--on-surface-3);margin-bottom:.25rem">Confianza del análisis</div>
           <div style="display:flex;align-items:center;gap:.625rem">
             <div class="confidence-bar" style="width:160px">
               <div id="confidence-fill" class="confidence-fill" style="width:0%;background:var(--primary)"></div>
@@ -178,23 +178,23 @@
 
   <!-- Evidencia -->
   <div id="topo-evidence-wrap" style="display:none;margin-bottom:1rem">
-    <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.5rem">Evidencia recopilada</div>
+    <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.5rem">Evidencia recopilada</div>
     <div id="topo-evidence"></div>
   </div>
 
   <!-- Referencia -->
-  <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.5rem">Referencia de topologías</div>
+  <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.5rem">Referencia de topologías</div>
   <div class="topo-ref-grid" id="topo-reference"></div>
 </div>
 
 <!-- LEYENDA -->
 <div class="topo-leyenda">
-  <span><span class="topo-dot-lg" style="background:#00d4ff;box-shadow:0 0 8px rgba(0,212,255,.5)"></span>Gateway / Router</span>
-  <span><span class="topo-dot-lg" style="background:#00e676;box-shadow:0 0 6px rgba(0,230,118,.4)"></span>En línea</span>
-  <span><span class="topo-dot-lg" style="background:#a78bfa;box-shadow:0 0 6px rgba(167,139,250,.4)"></span>Switch intermediario</span>
-  <span><span class="topo-dot-lg" style="background:#ffab00;box-shadow:0 0 6px rgba(255,171,0,.4)"></span>Con alerta</span>
-  <span><span class="topo-dot-lg" style="background:#ff3366;box-shadow:0 0 6px rgba(255,51,102,.3)"></span>Desconectado</span>
-  <span><span class="topo-dot-lg" style="background:#60a5fa;box-shadow:0 0 6px rgba(96,165,250,.3)"></span>Este servidor</span>
+  <span><span class="topo-dot-lg" style="background:var(--primary);box-shadow:0 0 8px rgba(0,212,255,.5)"></span>Gateway / Router</span>
+  <span><span class="topo-dot-lg" style="background:var(--green);box-shadow:0 0 6px rgba(0,230,118,.4)"></span>En línea</span>
+  <span><span class="topo-dot-lg" style="background:var(--violet);box-shadow:0 0 6px rgba(167,139,250,.4)"></span>Switch intermediario</span>
+  <span><span class="topo-dot-lg" style="background:var(--amber);box-shadow:0 0 6px rgba(255,171,0,.4)"></span>Con alerta</span>
+  <span><span class="topo-dot-lg" style="background:var(--red);box-shadow:0 0 6px rgba(255,51,102,.3)"></span>Desconectado</span>
+  <span><span class="topo-dot-lg" style="background:var(--sky);box-shadow:0 0 6px rgba(96,165,250,.3)"></span>Este servidor</span>
 </div>
 
 <!-- MAPA -->
@@ -251,7 +251,7 @@ function renderTopoReference(activeType) {
           ${t.nombre}${isActive ? ' ← TU RED' : ''}
         </span>
       </div>
-      <p style="font-size:.68rem;color:var(--on-surface-3);margin:0">${t.desc}</p>
+      <p style="font-size:.72rem;color:var(--on-surface-3);margin:0">${t.desc}</p>
     </div>`;
   }).join('');
 }
@@ -311,6 +311,153 @@ function refreshTopology() {
     });
 }
 
+// Colores de los nodos según el tema (Cytoscape dibuja en canvas: no usa var(--x))
+const TOPO_LIGHT = {
+  '#0a1a10': '#e6f6ec', '#031929': '#e3f2fa', '#021525': '#e5eefb', '#110d28': '#efeafc',
+  '#1a1300': '#fdf3e0', '#1a040c': '#fde8ee', '#a0c8e0': '#1d3348',
+  '#60a5fa': '#1d64c8', '#a78bfa': '#6d28d9',
+};
+function topoColor(hex) {
+  return isLightTheme() ? (TOPO_LIGHT[hex] || themeColor(hex)) : hex;
+}
+function topoStyle() {
+  return [
+    // ── Nodo base
+    {
+      selector: 'node',
+      style: {
+        'shape':             'ellipse',
+        'background-color':  topoColor('#0a1a10'),
+        'border-color':      topoColor('#00e676'),
+        'border-width':      2,
+        'width':             20,
+        'height':            20,
+        'label':             'data(label)',
+        'color':             topoColor('#a0c8e0'),
+        'font-size':         11,
+        'font-family':       'monospace',
+        'font-weight':       600,
+        'text-valign':       'bottom',
+        'text-halign':       'center',
+        'text-margin-y':     5,
+        'text-wrap':         'ellipsis',
+        'text-max-width':    80,
+        'min-zoomed-font-size': 7,
+        'shadow-blur':       8,
+        'shadow-color':      topoColor('#00e676'),
+        'shadow-opacity':    0.45,
+        'shadow-offset-x':   0,
+        'shadow-offset-y':   0,
+      }
+    },
+    // ── Router / Gateway — nodo central
+    {
+      selector: 'node[type = "router"]',
+      style: {
+        'background-color': topoColor('#031929'),
+        'border-color':     topoColor('#00d4ff'),
+        'border-width':     3,
+        'width':            34,
+        'height':           34,
+        'font-size':        13,
+        'font-weight':      700,
+        'color':            topoColor('#00d4ff'),
+        'shadow-color':     topoColor('#00d4ff'),
+        'shadow-opacity':   0.65,
+        'shadow-blur':      18,
+        'z-index':          3,
+      }
+    },
+    // ── Servidor (este equipo)
+    {
+      selector: '#server',
+      style: {
+        'background-color': topoColor('#021525'),
+        'border-color':     topoColor('#60a5fa'),
+        'border-width':     2.5,
+        'width':            28,
+        'height':           28,
+        'font-size':        12,
+        'color':            topoColor('#60a5fa'),
+        'shadow-color':     topoColor('#60a5fa'),
+        'shadow-opacity':   0.55,
+        'shadow-blur':      14,
+        'z-index':          2,
+      }
+    },
+    // ── Switch
+    {
+      selector: 'node[type = "switch"]',
+      style: {
+        'background-color': topoColor('#110d28'),
+        'border-color':     topoColor('#a78bfa'),
+        'border-width':     2,
+        'width':            24,
+        'height':           24,
+        'color':            topoColor('#a78bfa'),
+        'shadow-color':     topoColor('#a78bfa'),
+        'shadow-opacity':   0.5,
+        'shadow-blur':      12,
+        'z-index':          2,
+      }
+    },
+    // ── Alerta
+    {
+      selector: 'node[status = "warning"]',
+      style: {
+        'background-color': topoColor('#1a1300'),
+        'border-color':     topoColor('#ffab00'),
+        'shadow-color':     topoColor('#ffab00'),
+        'shadow-opacity':   0.5,
+      }
+    },
+    // ── Offline
+    {
+      selector: 'node[status = "offline"]',
+      style: {
+        'background-color': topoColor('#1a040c'),
+        'border-color':     topoColor('#ff3366'),
+        'border-style':     'dashed',
+        'shadow-color':     topoColor('#ff3366'),
+        'shadow-opacity':   0.25,
+        'shadow-blur':      8,
+        'opacity':          0.6,
+      }
+    },
+    // ── Seleccionado
+    {
+      selector: 'node:selected',
+      style: {
+        'border-color':    topoColor('#00d4ff'),
+        'border-width':    3,
+        'shadow-color':    topoColor('#00d4ff'),
+        'shadow-opacity':  0.85,
+        'shadow-blur':     22,
+        'overlay-color':   topoColor('#00d4ff'),
+        'overlay-padding': 4,
+        'overlay-opacity': 0.06,
+      }
+    },
+    // ── Aristas
+    {
+      selector: 'edge',
+      style: {
+        'width':              1.5,
+        'line-color':         topoColor('#00d4ff'),
+        'line-opacity':       0.15,
+        'curve-style':        'straight',
+        'target-arrow-shape': 'none',
+        'z-index':            0,
+      }
+    },
+    {
+      selector: 'edge:selected',
+      style: { 'line-color':topoColor('#00d4ff'), 'line-opacity':0.6, 'width':2.5 }
+    },
+  ];
+}
+document.addEventListener('ajflux:theme', () => { if (cy) cy.style(topoStyle()); });
+
 function renderTopology() {
   const topo      = window.AJFLUX.topology;
   const container = document.getElementById('topology-container');
@@ -348,140 +495,7 @@ function renderTopology() {
   cy = cytoscape({
     container,
     elements,
-    style: [
-      // ── Nodo base
-      {
-        selector: 'node',
-        style: {
-          'shape':             'ellipse',
-          'background-color':  '#0a1a10',
-          'border-color':      '#00e676',
-          'border-width':      2,
-          'width':             20,
-          'height':            20,
-          'label':             'data(label)',
-          'color':             '#a0c8e0',
-          'font-size':         9,
-          'font-family':       'monospace',
-          'font-weight':       600,
-          'text-valign':       'bottom',
-          'text-halign':       'center',
-          'text-margin-y':     5,
-          'text-wrap':         'ellipsis',
-          'text-max-width':    80,
-          'min-zoomed-font-size': 6,
-          'shadow-blur':       8,
-          'shadow-color':      '#00e676',
-          'shadow-opacity':    0.45,
-          'shadow-offset-x':   0,
-          'shadow-offset-y':   0,
-        }
-      },
-      // ── Router / Gateway — nodo central
-      {
-        selector: 'node[type = "router"]',
-        style: {
-          'background-color': '#031929',
-          'border-color':     '#00d4ff',
-          'border-width':     3,
-          'width':            34,
-          'height':           34,
-          'font-size':        11,
-          'font-weight':      700,
-          'color':            '#00d4ff',
-          'shadow-color':     '#00d4ff',
-          'shadow-opacity':   0.65,
-          'shadow-blur':      18,
-          'z-index':          3,
-        }
-      },
-      // ── Servidor (este equipo)
-      {
-        selector: '#server',
-        style: {
-          'background-color': '#021525',
-          'border-color':     '#60a5fa',
-          'border-width':     2.5,
-          'width':            28,
-          'height':           28,
-          'font-size':        10,
-          'color':            '#60a5fa',
-          'shadow-color':     '#60a5fa',
-          'shadow-opacity':   0.55,
-          'shadow-blur':      14,
-          'z-index':          2,
-        }
-      },
-      // ── Switch
-      {
-        selector: 'node[type = "switch"]',
-        style: {
-          'background-color': '#110d28',
-          'border-color':     '#a78bfa',
-          'border-width':     2,
-          'width':            24,
-          'height':           24,
-          'color':            '#a78bfa',
-          'shadow-color':     '#a78bfa',
-          'shadow-opacity':   0.5,
-          'shadow-blur':      12,
-          'z-index':          2,
-        }
-      },
-      // ── Alerta
-      {
-        selector: 'node[status = "warning"]',
-        style: {
-          'background-color': '#1a1300',
-          'border-color':     '#ffab00',
-          'shadow-color':     '#ffab00',
-          'shadow-opacity':   0.5,
-        }
-      },
-      // ── Offline
-      {
-        selector: 'node[status = "offline"]',
-        style: {
-          'background-color': '#1a040c',
-          'border-color':     '#ff3366',
-          'border-style':     'dashed',
-          'shadow-color':     '#ff3366',
-          'shadow-opacity':   0.25,
-          'shadow-blur':      8,
-          'opacity':          0.6,
-        }
-      },
-      // ── Seleccionado
-      {
-        selector: 'node:selected',
-        style: {
-          'border-color':    '#00d4ff',
-          'border-width':    3,
-          'shadow-color':    '#00d4ff',
-          'shadow-opacity':  0.85,
-          'shadow-blur':     22,
-          'overlay-color':   '#00d4ff',
-          'overlay-padding': 4,
-          'overlay-opacity': 0.06,
-        }
-      },
-      // ── Aristas
-      {
-        selector: 'edge',
-        style: {
-          'width':              1.5,
-          'line-color':         '#00d4ff',
-          'line-opacity':       0.15,
-          'curve-style':        'straight',
-          'target-arrow-shape': 'none',
-          'z-index':            0,
-        }
-      },
-      {
-        selector: 'edge:selected',
-        style: { 'line-color':'#00d4ff', 'line-opacity':0.6, 'width':2.5 }
-      },
-    ],
+    style: topoStyle(),
     layout: {
       name:           'concentric',
       animate:        true,

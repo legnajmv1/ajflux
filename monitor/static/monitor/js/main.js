@@ -4,6 +4,31 @@
 
 'use strict';
 
+// Adjunta automáticamente X-CSRFToken a toda petición de escritura hecha con
+// fetch() desde el panel web (sesión). La app móvil usa Authorization: Token
+// y el middleware la exime de CSRF, así que esto no le afecta.
+(function () {
+  function getCookie(name) {
+    const m = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return m ? decodeURIComponent(m[2]) : null;
+  }
+  const originalFetch = window.fetch;
+  window.fetch = function (input, init) {
+    init = init || {};
+    const method = (init.method || 'GET').toUpperCase();
+    if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+      const token = getCookie('csrftoken');
+      if (token) {
+        init.headers = new Headers(init.headers || {});
+        if (!init.headers.has('X-CSRFToken')) {
+          init.headers.set('X-CSRFToken', token);
+        }
+      }
+    }
+    return originalFetch(input, init);
+  };
+})();
+
 window.AJFLUX = {
   devices:   [],
   alerts:    [],
@@ -176,6 +201,53 @@ function exportPDF(reportId) {
   window.open(url, '_blank');
 }
 
+// ── Tema claro/oscuro ──────────────────────────
+// Chart.js dibuja en canvas y no entiende var(--x), así que los colores de
+// los gráficos se leen del CSS y se cambian a mano al alternar el tema.
+const THEME_LIGHT_SWAP = {
+  '#00d4ff': '#0077a8', '#00e676': '#0a8f4a', '#ffab00': '#b36b00', '#ff3366': '#d61f4f',
+};
+
+function isLightTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'light';
+}
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function themeColor(color) {
+  return isLightTheme() ? (THEME_LIGHT_SWAP[String(color).toLowerCase()] || color) : color;
+}
+
+function applyChartTheme() {
+  if (typeof Chart === 'undefined') return;
+  Object.values(Chart.instances).forEach(chart => {
+    const o = chart.options;
+    if (o.plugins && o.plugins.legend && o.plugins.legend.labels) o.plugins.legend.labels.color = cssVar('--chart-legend');
+    if (o.scales && o.scales.y) {
+      o.scales.y.grid.color = cssVar('--chart-grid');
+      o.scales.y.ticks.color = cssVar('--chart-tick');
+      if (o.scales.y.border) o.scales.y.border.color = cssVar('--chart-grid');
+    }
+    chart.data.datasets.forEach(ds => {
+      if (!ds._baseColor) return;
+      ds.borderColor = themeColor(ds._baseColor);
+      ds.backgroundColor = themeColor(ds._baseColor) + '14';
+    });
+    chart.update('none');
+  });
+}
+
+function toggleTheme() {
+  const light = !isLightTheme();
+  if (light) document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('ajflux.theme', light ? 'light' : 'dark'); } catch (e) {}
+  applyChartTheme();
+  document.dispatchEvent(new CustomEvent('ajflux:theme', { detail: { light } }));
+}
+
 // ── Gráfico de línea ───────────────────────────
 function makeLineChart(canvasId, labels, datasets, yLabel = '') {
   const ctx = document.getElementById(canvasId);
@@ -192,20 +264,20 @@ function makeLineChart(canvasId, labels, datasets, yLabel = '') {
       plugins: {
         legend: {
           display: datasets.length > 1,
-          labels: { color: '#6a90b8', font: { size: 10, family: "'JetBrains Mono', monospace" } },
+          labels: { color: cssVar('--chart-legend'), font: { size: 12, family: "'JetBrains Mono', monospace" } },
         },
       },
       scales: {
         x: { display: false },
         y: {
           min: 0,
-          grid: { color: 'rgba(0,212,255,0.04)' },
+          grid: { color: cssVar('--chart-grid') },
           ticks: {
-            color: '#3a5070',
-            font: { size: 10, family: "'JetBrains Mono', monospace" },
+            color: cssVar('--chart-tick'),
+            font: { size: 12, family: "'JetBrains Mono', monospace" },
             callback: v => v + yLabel,
           },
-          border: { color: 'rgba(0,212,255,0.06)' },
+          border: { color: cssVar('--chart-grid') },
         },
       },
     },
@@ -217,8 +289,9 @@ function chartDataset(data, color, label = '') {
   return {
     label,
     data,
-    borderColor: color,
-    backgroundColor: color + '14',
+    _baseColor: color,
+    borderColor: themeColor(color),
+    backgroundColor: themeColor(color) + '14',
     borderWidth: 1.5,
     pointRadius: 0,
     tension: 0.4,

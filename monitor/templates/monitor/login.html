@@ -7,11 +7,15 @@
 {% load static %}
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
+<script>
+try { if (localStorage.getItem('ajflux.theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+</script>
 <style>
 :root {
   --cy: #00d4ff; --bl: #0080ff; --pu: #7c3aed; --gr: #00e676; --rd: #ff3366;
   --bg: #000509; --font: 'Inter',sans-serif; --mono: 'JetBrains Mono',monospace;
 }
+:root[data-theme="light"] { --bg: #e9f0f7; }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html,body { width:100%; height:100%; background:var(--bg); font-family:var(--font);
   color:#d0e8ff; overflow:hidden; }
@@ -19,6 +23,22 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
   font-variation-settings:'FILL' 0,'wght' 400,'GRAD' 0,'opsz' 24;
   vertical-align:middle;
 }
+
+/* ── Botón de tema (claro/oscuro) ── */
+.theme-toggle {
+  position:fixed; top:1rem; right:1rem; z-index:5;
+  display:flex; align-items:center; gap:.4rem;
+  padding:.5rem .85rem; border-radius:999px; cursor:pointer;
+  background:rgba(0,212,255,.08); border:1px solid rgba(0,212,255,.25);
+  color:#d0e8ff; font-family:var(--font); font-size:.85rem; font-weight:600;
+}
+.theme-toggle .material-symbols-outlined { font-size:1.15rem; }
+.theme-toggle .theme-icon-light { display:none; }
+:root[data-theme="light"] .theme-toggle { background:#fff; border-color:rgba(0,90,140,.25); color:#0c1e2e;
+  box-shadow:0 2px 10px rgba(15,40,70,.1); }
+:root[data-theme="light"] .theme-toggle .theme-icon-light { display:inline; }
+:root[data-theme="light"] .theme-toggle .theme-icon-dark  { display:none; }
+:root[data-theme="light"] .monitor { filter: drop-shadow(0 20px 50px rgba(15,40,70,.25)); }
 
 /* ── CANVAS FONDO: ONDAS COMPLETO ── */
 #wave-bg { position:fixed; inset:0; z-index:0; pointer-events:none; }
@@ -42,7 +62,7 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
 
 /* Bisel exterior — frame del monitor de PC */
 .bezel {
-  width: min(500px, 94vw);
+  width: min(560px, 94vw);
   background: linear-gradient(180deg, #152535 0%, #0e1c2c 40%, #0a1520 100%);
   border: 4px solid rgba(0,212,255,.30);
   border-radius: 18px 18px 6px 6px;
@@ -159,26 +179,26 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
 }
 
 /* ── FORM ELEMENTS ── */
-.brand { font-size:1.9rem; font-weight:900; letter-spacing:-.05em;
+.brand { font-size:2.2rem; font-weight:900; letter-spacing:-.05em;
   background:linear-gradient(135deg,#00d4ff 30%,#0080ff);
   -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
   filter:drop-shadow(0 0 10px rgba(0,212,255,.4));
 }
 .brand-row { display:flex; align-items:baseline; gap:.4rem; margin-bottom:.2rem; }
-.brand-ver { font-family:var(--mono); font-size:.5rem; color:rgba(0,212,255,.35); letter-spacing:.12em; }
-.brand-sub { font-size:.58rem; font-weight:600; text-transform:uppercase; letter-spacing:.15em;
+.brand-ver { font-family:var(--mono); font-size:.72rem; color:rgba(0,212,255,.35); letter-spacing:.12em; }
+.brand-sub { font-size:.75rem; font-weight:600; text-transform:uppercase; letter-spacing:.15em;
   color:#3a5878; font-family:var(--mono); margin-bottom:1.5rem; }
 
 .error-msg {
   background:rgba(255,51,102,.08); border:1px solid rgba(255,51,102,.25);
-  color:#ff6680; border-radius:7px; padding:.65rem .875rem; font-size:.77rem;
+  color:#ff6680; border-radius:7px; padding:.65rem .875rem; font-size:.9rem;
   margin-bottom:1rem; display:flex; align-items:center; gap:.45rem;
   animation:shake .3s ease;
 }
 @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
 
 .field { margin-bottom:.875rem; }
-.field label { display:block; font-size:.58rem; font-weight:700; text-transform:uppercase;
+.field label { display:block; font-size:.78rem; font-weight:700; text-transform:uppercase;
   letter-spacing:.1em; color:#3a5878; margin-bottom:.35rem; }
 .field-wrap { position:relative; }
 .ficon { position:absolute; left:.75rem; top:50%; transform:translateY(-50%);
@@ -187,7 +207,7 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
 .field input {
   width:100%; background:rgba(0,212,255,.028); border:1px solid rgba(0,212,255,.1);
   border-radius:7px; padding:.65rem .875rem .65rem 2.5rem;
-  color:#d0e8ff; font-family:var(--font); font-size:.82rem; outline:none;
+  color:#d0e8ff; font-family:var(--font); font-size:1rem; outline:none;
   transition:border-color .2s, box-shadow .2s;
 }
 .field input:focus { border-color:rgba(0,212,255,.28);
@@ -198,7 +218,7 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
   width:100%; margin-top:.4rem;
   background:linear-gradient(135deg,#00d4ff,#0080ff);
   border:none; border-radius:7px; padding:.75rem;
-  font-family:var(--font); font-size:.78rem; font-weight:800;
+  font-family:var(--font); font-size:.92rem; font-weight:800;
   text-transform:uppercase; letter-spacing:.12em; color:#000d18;
   display:flex; align-items:center; justify-content:center; gap:.45rem;
   cursor:pointer; transition:transform .15s, box-shadow .2s; position:relative; overflow:hidden;
@@ -215,7 +235,7 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
   border-top:1px solid rgba(255,255,255,.04);
   display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.4rem; }
 .fbadge { display:inline-flex; align-items:center; gap:.28rem; padding:.18rem .6rem;
-  border-radius:999px; font-size:.58rem; font-weight:700; border:1px solid; }
+  border-radius:999px; font-size:.75rem; font-weight:700; border:1px solid; }
 .fbadge-a { background:rgba(0,212,255,.08); color:var(--cy); border-color:rgba(0,212,255,.18); }
 .fbadge-o { background:rgba(0,128,255,.08); color:#4da6ff; border-color:rgba(0,128,255,.18); }
 .fbadge-v { background:rgba(124,58,237,.08); color:#a78bfa; border-color:rgba(124,58,237,.18); }
@@ -239,6 +259,12 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
 
 <!-- FONDO: ONDAS COMPLETO -->
 <canvas id="wave-bg"></canvas>
+
+<button type="button" class="theme-toggle" onclick="toggleTheme()" aria-label="Cambiar tema claro/oscuro">
+  <span class="material-symbols-outlined theme-icon-dark">light_mode</span>
+  <span class="material-symbols-outlined theme-icon-light">dark_mode</span>
+  <span class="theme-toggle-label">Tema</span>
+</button>
 
 <div class="scene">
   <div class="monitor">
@@ -331,6 +357,9 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
   function resize() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
 
   // 5 capas de ondas: diferentes colores, amplitudes, frecuencias
+  // En tema claro las ondas usan tonos más oscuros para verse sobre el fondo claro
+  const LIGHT_WAVE = { '#00d4ff':'#0077a8', '#00e676':'#0a8f4a' };
+  const isLight = () => document.documentElement.getAttribute('data-theme') === 'light';
   const LAYERS = [
     { color:'#00d4ff', amp:.06,  freq:.008, speed:.5,  phase:0,   alpha:.18, width:1.5 },
     { color:'#0080ff', amp:.05,  freq:.011, speed:.8,  phase:2.1, alpha:.14, width:1.2 },
@@ -368,10 +397,11 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
                       + H * L.amp * .4 * Math.sin(x * L.freq * 2.1 + t * L.speed * .7 + L.phase + 1);
           x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = L.color;
-        ctx.globalAlpha = L.alpha;
+        const col = isLight() ? (LIGHT_WAVE[L.color] || L.color) : L.color;
+        ctx.strokeStyle = col;
+        ctx.globalAlpha = isLight() ? Math.min(1, L.alpha * 1.6) : L.alpha;
         ctx.lineWidth   = L.width;
-        ctx.shadowColor = L.color;
+        ctx.shadowColor = col;
         ctx.shadowBlur  = 8;
         ctx.stroke();
         ctx.shadowBlur  = 0;
@@ -388,7 +418,7 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
         if (d<MAX_D) {
           const a=(1-d/MAX_D)*.07;
           ctx.beginPath();
-          ctx.strokeStyle=`rgba(0,180,255,${a})`;
+          ctx.strokeStyle= isLight() ? `rgba(0,119,168,${a*1.5})` : `rgba(0,180,255,${a})`;
           ctx.lineWidth=.4;
           ctx.moveTo(nodes[i].x,nodes[i].y);
           ctx.lineTo(nodes[j].x,nodes[j].y);
@@ -401,7 +431,7 @@ html,body { width:100%; height:100%; background:var(--bg); font-family:var(--fon
       const g=.5+.5*Math.sin(n.p);
       ctx.beginPath();
       ctx.arc(n.x,n.y,n.r,0,Math.PI*2);
-      ctx.fillStyle=`rgba(0,212,255,${.12+.18*g})`;
+      ctx.fillStyle= isLight() ? `rgba(0,119,168,${.12+.18*g})` : `rgba(0,212,255,${.12+.18*g})`;
       ctx.fill();
       n.x+=n.vx; n.y+=n.vy;
       if(n.x<0||n.x>W)n.vx*=-1;
@@ -650,6 +680,14 @@ function startCableAnim(onDone) {
   }
 
   requestAnimationFrame(frame);
+}
+</script>
+<script>
+function toggleTheme() {
+  const light = document.documentElement.getAttribute('data-theme') !== 'light';
+  if (light) document.documentElement.setAttribute('data-theme', 'light');
+  else document.documentElement.removeAttribute('data-theme');
+  try { localStorage.setItem('ajflux.theme', light ? 'light' : 'dark'); } catch (e) {}
 }
 </script>
 </body>

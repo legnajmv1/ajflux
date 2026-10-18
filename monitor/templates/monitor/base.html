@@ -4,6 +4,10 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>{% block title %}AJFLUX{% endblock %} — Monitor QoS</title>
+<script>
+// Aplica el tema guardado antes de pintar, para evitar un parpadeo oscuro→claro
+try { if (localStorage.getItem('ajflux.theme') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+</script>
 {% load static %}
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet"/>
@@ -21,16 +25,16 @@
   /* Ocultar canvas animado en móvil — mejora rendimiento y nitidez */
   #net-canvas { display: none !important; }
   /* Fondo sólido en vez del canvas */
-  body { background: #030609 !important; }
+  body { background: var(--bg) !important; }
   /* Fondos opacos para todos los paneles */
   .stat-card, .qos-panel, .alerts-panel, .chart-panel,
   .metric-card, .analysis-panel, .active-devices-panel,
   .scan-history, .filter-bar, .device-selector,
   .devices-table-wrap, .metrics-summary-wrap {
-    background: rgba(10, 18, 30, 0.98) !important;
+    background: var(--surface) !important;
   }
-  /* Mejor contraste de texto en móvil */
-  :root {
+  /* Mejor contraste de texto en móvil (solo tema oscuro) */
+  :root:not([data-theme="light"]) {
     --on-surface-2: #8fb0d0 !important;
     --on-surface-3: #5a7898 !important;
   }
@@ -46,6 +50,9 @@
 </style>
 </head>
 <body>
+
+<!-- Fuerza la cookie csrftoken para que main.js la adjunte en POST/DELETE -->
+<form style="display:none">{% csrf_token %}</form>
 
 <!-- CANVAS ANIMADO DE RED -->
 <canvas id="net-canvas"></canvas>
@@ -85,7 +92,7 @@
         <div>
           <h3 id="modal-name" style="font-size:1rem;color:var(--on-surface)"></h3>
           <p id="modal-vendor"
-            style="font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin:0"></p>
+            style="font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin:0"></p>
         </div>
       </div>
       <button class="modal-close" onclick="closeModal()">
@@ -135,7 +142,7 @@
             style="font-size:1.1rem;color:var(--primary)">computer</span>
           <div>
             <div id="modal-os" style="color:var(--on-surface);font-weight:600;font-size:.875rem"></div>
-            <div id="modal-os-acc" style="font-size:.68rem;color:var(--on-surface-3);font-family:var(--font-mono)"></div>
+            <div id="modal-os-acc" style="font-size:.72rem;color:var(--on-surface-3);font-family:var(--font-mono)"></div>
           </div>
         </div>
       </div>
@@ -220,7 +227,7 @@
       <div style="flex:1;min-width:0">
         <div style="font-weight:600;font-size:.84rem;color:var(--on-surface);overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
           id="sidebar-username">Cargando...</div>
-        <div style="font-size:.68rem;color:var(--on-surface-3);font-family:var(--font-mono)"
+        <div style="font-size:.72rem;color:var(--on-surface-3);font-family:var(--font-mono)"
           id="sidebar-role">—</div>
       </div>
       <a href="/logout/" title="Cerrar sesión"
@@ -255,6 +262,11 @@
           <span id="live-label"
             style="font-size:.72rem;font-weight:700;color:var(--on-surface-2)">En vivo</span>
         </div>
+        <button class="topbar-btn theme-toggle" onclick="toggleTheme()" id="btn-theme"
+          title="Cambiar tema claro/oscuro" aria-label="Cambiar tema claro/oscuro">
+          <span class="material-symbols-outlined theme-icon-dark">light_mode</span>
+          <span class="material-symbols-outlined theme-icon-light">dark_mode</span>
+        </button>
         <button class="topbar-btn" onclick="triggerScan()" data-admin-only id="btn-scan">
           <span class="material-symbols-outlined">radar</span>
           <span class="hide-sm">Escanear Red</span>
@@ -331,6 +343,7 @@
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
+    const rgb = getComputedStyle(document.documentElement).getPropertyValue('--canvas-rgb').trim() || '0, 212, 255';
     const MAX_DIST = 160;
 
     // Líneas entre nodos cercanos
@@ -342,7 +355,7 @@
         if (d < MAX_DIST) {
           const alpha = (1 - d / MAX_DIST) * 0.25;
           ctx.beginPath();
-          ctx.strokeStyle = `rgba(0, 180, 255, ${alpha})`;
+          ctx.strokeStyle = `rgba(${rgb}, ${alpha})`;
           ctx.lineWidth = 0.6;
           ctx.moveTo(nodes[i].x, nodes[i].y);
           ctx.lineTo(nodes[j].x, nodes[j].y);
@@ -358,13 +371,13 @@
 
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0, 212, 255, ${0.4 + 0.5 * glow})`;
+      ctx.fillStyle = `rgba(${rgb}, ${0.4 + 0.5 * glow})`;
       ctx.fill();
 
       // halo
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.r + 3 * glow, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0, 212, 255, ${0.06 * glow})`;
+      ctx.fillStyle = `rgba(${rgb}, ${0.06 * glow})`;
       ctx.fill();
 
       // movimiento + rebote
@@ -418,7 +431,7 @@ function openModal(id) {
   if (d.services && Object.keys(d.services).length) {
     svcEl.innerHTML = Object.entries(d.services).map(([port, svc]) =>
       `<span style="background:var(--bg-3);border:1px solid var(--border);
-        border-radius:var(--r-sm);padding:2px 8px;font-size:.68rem;
+        border-radius:var(--r-sm);padding:2px 8px;font-size:.72rem;
         font-family:var(--font-mono);color:var(--on-surface-2)">
         <span style="color:var(--primary)">${port}</span>
         /${svc.name||'?'} ${svc.product||''} ${svc.version||''}

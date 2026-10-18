@@ -7,7 +7,7 @@
 {% block extra_css %}
 <style>
 .config-section {
-  background: rgba(10,18,30,0.9);
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   overflow: hidden;
@@ -35,7 +35,7 @@
   align-items: center; justify-content: center;
   font-size: .78rem; font-weight: 700; color: var(--on-surface);
 }
-.countdown-val span { font-size: .58rem; color: var(--on-surface-3); font-weight: 400; }
+.countdown-val span { font-size: .72rem; color: var(--on-surface-3); font-weight: 400; }
 
 /* Mini stat box */
 .mini-box {
@@ -47,7 +47,7 @@
   min-width: 90px;
 }
 .mini-box .val { font-weight: 800; font-size: 1.2rem; font-family: var(--font-mono); }
-.mini-box .lbl { font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; color: var(--on-surface-3); margin-top: 2px; }
+.mini-box .lbl { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--on-surface-3); margin-top: 2px; }
 
 /* Umbrales */
 .thr-grid {
@@ -84,7 +84,7 @@
 }
 .thr-input:focus { border-color: var(--border-2); box-shadow: 0 0 0 2px rgba(0,212,255,.08); }
 .thr-input.custom { border-color: rgba(0,212,255,.3); background: rgba(0,212,255,.04); }
-.thr-input::placeholder { color: var(--on-surface-3); font-size: .7rem; }
+.thr-input::placeholder { color: var(--on-surface-3); font-size: .72rem; }
 
 .save-thr {
   background: rgba(0,212,255,.08);
@@ -93,7 +93,7 @@
   border-radius: var(--r-sm);
   padding: .3rem .625rem;
   cursor: pointer;
-  font-size: .7rem;
+  font-size: .72rem;
   font-weight: 700;
   font-family: var(--font);
   transition: all .2s;
@@ -109,7 +109,7 @@
   border-radius: var(--r-sm);
   padding: .3rem .5rem;
   cursor: pointer;
-  font-size: .7rem;
+  font-size: .72rem;
   transition: all .2s;
   display: flex; align-items: center;
 }
@@ -128,7 +128,7 @@
 /* Toast */
 .saved-toast {
   position: fixed; bottom: 1.5rem; right: 1.5rem;
-  background: rgba(10,18,30,0.95);
+  background: var(--surface);
   border: 1px solid rgba(0,230,118,.3);
   color: var(--green);
   padding: .75rem 1.25rem;
@@ -179,7 +179,7 @@
   <div class="config-section-header">
     <div style="display:flex;align-items:center;gap:.5rem">
       <span class="material-symbols-outlined" style="font-size:1rem;color:var(--primary)">schedule</span>
-      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Estado del Monitor</span>
+      <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Estado del Monitor</span>
     </div>
   </div>
   <div class="config-section-body">
@@ -194,8 +194,8 @@
               style="transition:stroke-dashoffset 1s linear"/>
             <defs>
               <linearGradient id="cdGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#00d4ff"/>
-                <stop offset="100%" stop-color="#0080ff"/>
+                <stop offset="0%" style="stop-color:var(--primary)"/>
+                <stop offset="100%" style="stop-color:var(--blue)"/>
               </linearGradient>
             </defs>
           </svg>
@@ -207,7 +207,7 @@
         <div>
           <div style="font-weight:700;color:var(--on-surface);font-size:.875rem">Próximo escaneo</div>
           <div style="font-size:.72rem;color:var(--on-surface-3);margin-top:2px;font-family:var(--font-mono)" id="next-scan-label">Calculando...</div>
-          <div style="font-size:.68rem;color:var(--on-surface-3);margin-top:2px;font-family:var(--font-mono)" id="last-scan-label">—</div>
+          <div style="font-size:.72rem;color:var(--on-surface-3);margin-top:2px;font-family:var(--font-mono)" id="last-scan-label">—</div>
         </div>
       </div>
 
@@ -228,7 +228,7 @@
     </div>
 
     <div style="margin-top:1.25rem;padding-top:1rem;border-top:1px solid var(--border)">
-      <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.75rem">Umbrales Globales</div>
+      <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3);margin-bottom:.75rem">Umbrales Globales</div>
       <div style="display:flex;flex-wrap:wrap;gap:.5rem" id="global-thresholds"></div>
     </div>
   </div>
@@ -239,18 +239,18 @@
   <div class="config-section-header">
     <div style="display:flex;align-items:center;gap:.5rem">
       <span class="material-symbols-outlined" style="font-size:1rem;color:var(--amber)">notifications_active</span>
-      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Umbrales de Alerta por Dispositivo</span>
+      <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Umbrales de Alerta por Dispositivo</span>
     </div>
-    <span style="font-size:.68rem;color:var(--on-surface-3)">Vacío = valor global · <strong style="color:var(--primary)">Guardar</strong> para aplicar</span>
+    <span style="font-size:.72rem;color:var(--on-surface-3)">Vacío = valor global · <strong style="color:var(--primary)">Guardar</strong> para aplicar</span>
   </div>
 
   <div class="thr-head">
     <div class="label">Dispositivo</div>
-    <div class="label" style="text-align:center">Lat. Alerta<br><span style="font-size:.6rem">(ms)</span></div>
-    <div class="label" style="text-align:center">Lat. Crítica<br><span style="font-size:.6rem">(ms)</span></div>
-    <div class="label hide-sm-thr" style="text-align:center">Jitter<br><span style="font-size:.6rem">(ms)</span></div>
-    <div class="label hide-sm-thr" style="text-align:center">Loss<br><span style="font-size:.6rem">(%)</span></div>
-    <div class="label hide-sm-thr" style="text-align:center">QoS mín<br><span style="font-size:.6rem">(%)</span></div>
+    <div class="label" style="text-align:center">Lat. Alerta<br><span style="font-size:.72rem">(ms)</span></div>
+    <div class="label" style="text-align:center">Lat. Crítica<br><span style="font-size:.72rem">(ms)</span></div>
+    <div class="label hide-sm-thr" style="text-align:center">Jitter<br><span style="font-size:.72rem">(ms)</span></div>
+    <div class="label hide-sm-thr" style="text-align:center">Loss<br><span style="font-size:.72rem">(%)</span></div>
+    <div class="label hide-sm-thr" style="text-align:center">QoS mín<br><span style="font-size:.72rem">(%)</span></div>
     <div class="label" style="text-align:center">Acción</div>
   </div>
 
@@ -267,7 +267,7 @@
   <div class="config-section-header">
     <div style="display:flex;align-items:center;gap:.5rem">
       <span class="material-symbols-outlined" style="font-size:1rem;color:var(--blue)">wifi_tethering</span>
-      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Interfaces de Red Detectadas</span>
+      <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Interfaces de Red Detectadas</span>
     </div>
   </div>
   <div class="config-section-body" id="network-info-panel">
@@ -280,7 +280,7 @@
   <div class="config-section-header">
     <div style="display:flex;align-items:center;gap:.5rem">
       <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">build</span>
-      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Acciones</span>
+      <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Acciones</span>
     </div>
   </div>
   <div class="config-section-body" style="display:flex;flex-direction:column;gap:.625rem">
@@ -302,7 +302,7 @@
   <div class="config-section-header">
     <div style="display:flex;align-items:center;gap:.5rem">
       <span class="material-symbols-outlined" style="font-size:1rem;color:var(--on-surface-3)">info</span>
-      <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Acerca de AJFLUX</span>
+      <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--on-surface-3)">Acerca de AJFLUX</span>
     </div>
   </div>
   <div class="config-section-body">
@@ -421,9 +421,9 @@ function renderThresholds(thresholds) {
         <div style="min-width:0">
           <div style="font-weight:600;font-size:.8rem;color:var(--on-surface);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.hostname}</div>
           <div style="display:flex;align-items:center;gap:.3rem;margin-top:2px;flex-wrap:wrap">
-            <span class="mono" style="font-size:.68rem;color:var(--on-surface-3)">${t.ip}</span>
-            <span class="chip ${sc}" style="font-size:.58rem;padding:1px 5px">${stlb}</span>
-            ${t.has_custom ? `<span style="font-size:.6rem;background:rgba(0,212,255,.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-weight:700;font-family:var(--font-mono)">CUSTOM</span>` : ''}
+            <span class="mono" style="font-size:.72rem;color:var(--on-surface-3)">${t.ip}</span>
+            <span class="chip ${sc}" style="font-size:.72rem;padding:1px 5px">${stlb}</span>
+            ${t.has_custom ? `<span style="font-size:.72rem;background:rgba(0,212,255,.1);color:var(--primary);padding:1px 5px;border-radius:3px;font-weight:700;font-family:var(--font-mono)">CUSTOM</span>` : ''}
           </div>
         </div>
       </div>
