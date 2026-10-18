@@ -22,6 +22,11 @@ class TokenAuthMiddleware:
             try:
                 token = Token.objects.select_related('user').get(key=auth.split(' ', 1)[1])
                 request.user = token.user
+                # La app móvil no tiene sesión/cookie CSRF: un token válido la exime.
+                # Debe marcarse aquí (antes de que el handler llame a process_view),
+                # no con @csrf_exempt en la vista, que CsrfViewMiddleware ya ignoraría
+                # por ser una marca estática que no puede depender de la petición.
+                request._dont_enforce_csrf_checks = True
             except Token.DoesNotExist:
                 request.user = AnonymousUser()
         return self.get_response(request)

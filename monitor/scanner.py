@@ -52,11 +52,24 @@ except ImportError:
 # INTERFACES — psutil
 # ═══════════════════════════════════════════════════
 
+_VIRTUAL_IFACE_PREFIXES = ('docker', 'br-', 'veth', 'virbr')
+
+
+def _is_virtual_iface(name: str) -> bool:
+    n = name.lower()
+    return n == 'lo' or n.startswith(_VIRTUAL_IFACE_PREFIXES)
+
+
 def get_local_interfaces() -> list:
     """
     Detecta interfaces de red usando psutil.
     psutil.net_if_addrs() devuelve IPs, mascaras y MACs.
     psutil.net_if_stats() devuelve velocidad y estado.
+
+    Excluye interfaces virtuales (loopback, docker, bridges, veth, virbr) y,
+    si la variable de entorno SCAN_NETWORKS está definida (redes CIDR separadas
+    por comas), limita el resultado a esas redes — útil en servidores con
+    varias interfaces donde solo algunas deben escanearse.
     """
     interfaces = []
     gateway = _get_gateway()
@@ -64,6 +77,8 @@ def get_local_interfaces() -> list:
     if HAS_PSUTIL:
         stats = psutil.net_if_stats()
         for iface, addrs in psutil.net_if_addrs().items():
+            if _is_virtual_iface(iface):
+                continue
             if IS_WINDOWS and iface in stats and not stats[iface].isup:
                 continue
             for addr in addrs:
@@ -86,6 +101,11 @@ def get_local_interfaces() -> list:
                             pass
     else:
         _interfaces_fallback(interfaces, gateway)
+        interfaces = [i for i in interfaces if not _is_virtual_iface(i['name'])]
+
+    scan_networks = [n.strip() for n in os.environ.get('SCAN_NETWORKS', '').split(',') if n.strip()]
+    if scan_networks:
+        interfaces = [i for i in interfaces if i['network'] in scan_networks]
 
     return interfaces
 
@@ -499,6 +519,21 @@ def _parse_linux_ping(output: str) -> dict:
 # NMAP — python-nmap (puertos, servicios, SO)
 # ═══════════════════════════════════════════════════
 
+def _nmap_binary_available() -> bool:
+    import shutil
+    return shutil.which('nmap') is not None
+
+
+def _can_run_os_detection() -> bool:
+    """-O necesita privilegios para enviar paquetes RAW (root en Linux)."""
+    if IS_WINDOWS:
+        return True  # en Windows nmap usa Npcap, no depende de euid
+    try:
+        return os.geteuid() == 0
+    except AttributeError:
+        return False
+
+
 def nmap_scan_device(ip: str) -> dict:
     """
     Analisis completo de un dispositivo con python-nmap.
@@ -512,20 +547,36 @@ def nmap_scan_device(ip: str) -> dict:
     }
 
     if not HAS_NMAP:
+        logger.warning(f"[NMAP] {ip}: python-nmap no instalado — usando solo socket")
         result['ports'] = scan_ports_socket(ip)
         return result
 
-    base_args = '-sV -T4 --host-timeout 10s'
+    if not _nmap_binary_available():
+        logger.warning(f"[NMAP] {ip}: binario 'nmap' no encontrado en PATH — usando solo socket")
+        result['ports'] = scan_ports_socket(ip)
+        return result
+
+    # --host-timeout corto hace que -sV (que prueba servicios puerto por puerto)
+    # mate el escaneo antes de terminar en hosts con varios puertos abiertos.
+    base_args = '-sV -T4 --host-timeout 25s'
     os_args   = '-O --osscan-guess'
+    can_os    = _can_run_os_detection()
+    if not can_os:
+        logger.info(f"[NMAP] {ip}: -O omitido (sin privilegios root/sudo) — se usará solo -sV")
 
     try:
         nm = nmap_lib.PortScanner()
-        try:
-            nm.scan(ip, arguments=f'{base_args} {os_args}'.strip())
-        except Exception:
+        if can_os:
+            try:
+                nm.scan(ip, arguments=f'{base_args} {os_args}')
+            except Exception as e:
+                logger.warning(f"[NMAP] {ip}: falló con -O ({e}) — reintentando sin detección de SO")
+                nm.scan(ip, arguments=base_args)
+        else:
             nm.scan(ip, arguments=base_args)
 
         if ip not in nm.all_hosts():
+            logger.warning(f"[NMAP] {ip}: sin respuesta dentro del host-timeout — 0 puertos/SO")
             return result
 
         host = nm[ip]
@@ -548,6 +599,11 @@ def nmap_scan_device(ip: str) -> dict:
             best = host['osmatch'][0]
             result['os_info'] = best.get('name', 'Desconocido')
             result['os_accuracy'] = int(best.get('accuracy', 0))
+        elif can_os:
+            logger.info(f"[NMAP] {ip}: -O corrió pero no hubo coincidencia de SO (huella insuficiente)")
+
+        if not result['ports']:
+            logger.info(f"[NMAP] {ip}: 0 puertos abiertos detectados")
 
         logger.info(f"[NMAP] {ip}: {len(result['ports'])} puertos, OS={result['os_info']}")
 
@@ -639,14 +695,50 @@ def get_mac_from_arp(ip: str) -> Optional[str]:
 # VENDOR OUI LOOKUP
 # ═══════════════════════════════════════════════════
 
+NMAP_MAC_PREFIXES_PATH = '/usr/share/nmap/nmap-mac-prefixes'
+_nmap_oui_cache = None  # dict OUI(6 hex) -> fabricante, cargado una sola vez
+
+
+def _load_nmap_oui_prefixes() -> dict:
+    """Carga /usr/share/nmap/nmap-mac-prefixes (miles de OUI IEEE) una sola vez."""
+    global _nmap_oui_cache
+    if _nmap_oui_cache is not None:
+        return _nmap_oui_cache
+    prefixes = {}
+    try:
+        with open(NMAP_MAC_PREFIXES_PATH, 'r', encoding='utf-8', errors='ignore') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                oui, _, vendor = line.partition(' ')
+                if len(oui) == 6:
+                    prefixes[oui.upper()] = vendor.strip()
+        logger.info(f"[SCANNER] {len(prefixes)} prefijos OUI cargados de {NMAP_MAC_PREFIXES_PATH}")
+    except Exception as e:
+        logger.warning(f"[SCANNER] No se pudo leer {NMAP_MAC_PREFIXES_PATH}: {e}")
+    _nmap_oui_cache = prefixes
+    return prefixes
+
+
 def get_vendor_from_mac(mac: str) -> str:
-    """Identifica fabricante por OUI (primeros 3 bytes de la MAC)."""
+    """Identifica fabricante por OUI (primeros 3 bytes de la MAC).
+
+    Primero busca en la base completa de Nmap (miles de fabricantes); si no
+    está disponible o no encuentra el OUI, usa el diccionario reducido como
+    respaldo.
+    """
     if not mac or mac in ('Unknown', ''):
         return 'Desconocido'
     mc = mac.replace(':', '').replace('-', '').upper()
     if len(mc) < 6:
         return 'Desconocido'
     oui = mc[:6]
+
+    nmap_vendor = _load_nmap_oui_prefixes().get(oui)
+    if nmap_vendor:
+        return nmap_vendor
+
     OUI = {
         'B827EB': 'Raspberry Pi', 'DCA632': 'Raspberry Pi', 'E45F01': 'Raspberry Pi',
         '005056': 'VMware', '000C29': 'VMware', '001C42': 'Parallels',

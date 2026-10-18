@@ -33,6 +33,8 @@ class Device(models.Model):
     qos_minimum      = models.FloatField(null=True, blank=True)
     threshold_notes  = models.TextField(blank=True, default='')
 
+    active = models.BooleanField(default=True)  # False = desactivado por inactividad; conserva historial
+
     @property
     def open_ports(self):
         try:
@@ -134,9 +136,19 @@ class Alert(models.Model):
         ('warning',  'Warning'),
         ('critical', 'Critical'),
     ]
-    device    = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='alerts', null=True, blank=True)
-    level     = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='info')
-    message   = models.TextField()
+    TYPE_CHOICES = [
+        ('latency',     'Latencia'),
+        ('jitter',      'Jitter'),
+        ('loss',        'Pérdida de paquetes'),
+        ('qos',         'QoS bajo'),
+        ('disconnect',  'Desconexión'),
+        ('new_device',  'Nuevo dispositivo'),
+        ('other',       'Otro'),
+    ]
+    device     = models.ForeignKey(Device, on_delete=models.CASCADE, related_name='alerts', null=True, blank=True)
+    level      = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='info')
+    alert_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='other')
+    message    = models.TextField()
     timestamp = models.DateTimeField(default=timezone.now)
     resolved  = models.BooleanField(default=False)
 

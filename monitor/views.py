@@ -12,6 +12,8 @@ from django.utils import timezone
 from datetime import timedelta
 import logging
 
+from monitor.auth_utils import login_required_ajax, config_required
+
 logger = logging.getLogger(__name__)
 _scan_state = {"running": False, "progress": 0, "message": "", "last_result": None}
 
@@ -59,10 +61,11 @@ def configuracion(request):
 # ══════════════════════════════════════════════════════════
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_devices(request):
     from monitor.models import Device
     out = []
-    for d in Device.objects.all().order_by("ip"):
+    for d in Device.objects.filter(active=True).order_by("ip"):
         l = d.metrics.first()
         out.append({
             "id": d.id, "ip": d.ip, "mac": d.mac,
@@ -79,13 +82,14 @@ def api_devices(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_devices_by_network(request):
     """Devuelve los dispositivos agrupados por red. Una lista por cada interfaz."""
     from monitor.models import Device
     from collections import defaultdict
 
     grupos = defaultdict(list)
-    for d in Device.objects.all().order_by('network', 'ip'):
+    for d in Device.objects.filter(active=True).order_by('network', 'ip'):
         l = d.metrics.first()
         red = d.network or 'Sin red'
         grupos[red].append({
@@ -117,10 +121,11 @@ def api_devices_by_network(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_live(request):
     from monitor.models import Device, Alert
     devs = []
-    for d in Device.objects.all().order_by("ip"):
+    for d in Device.objects.filter(active=True).order_by("ip"):
         l = d.metrics.first()
         devs.append({
             "id": d.id, "ip": d.ip, "mac": d.mac,
@@ -152,6 +157,7 @@ def api_live(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_metrics(request):
     from monitor.models import Device
     did    = request.GET.get("device_id")
@@ -180,11 +186,12 @@ def api_metrics(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_topology(request):
     from monitor.models import Device
     from monitor.scanner import build_smart_topology
     import socket
-    devs = list(Device.objects.all().values("ip", "hostname", "device_type", "mac", "vendor", "status", "is_gateway"))
+    devs = list(Device.objects.filter(active=True).values("ip", "hostname", "device_type", "mac", "vendor", "status", "is_gateway"))
     gw   = next((d for d in devs if d["is_gateway"]), None)
     try:   own_ip = socket.gethostbyname(socket.gethostname())
     except: own_ip = "127.0.0.1"
@@ -194,11 +201,12 @@ def api_topology(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_topology_analyze(request):
     from monitor.models import Device
     from monitor.scanner import detect_intermediary_devices, classify_topology
     import socket
-    devs = list(Device.objects.all().values("ip", "hostname", "device_type", "mac", "vendor", "status", "is_gateway"))
+    devs = list(Device.objects.filter(active=True).values("ip", "hostname", "device_type", "mac", "vendor", "status", "is_gateway"))
     gw   = next((d for d in devs if d["is_gateway"]), None)
     try:   own_ip = socket.gethostbyname(socket.gethostname())
     except: own_ip = "127.0.0.1"
@@ -210,6 +218,7 @@ def api_topology_analyze(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_reports(request):
     from monitor.models import ScanReport
     return JsonResponse({"reports": [
@@ -227,6 +236,7 @@ def api_reports(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_alerts(request):
     from monitor.models import Alert
     return JsonResponse({"alerts": [
@@ -239,15 +249,14 @@ def api_alerts(request):
     ]})
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
+@config_required
 def api_resolve_alert(request, alert_id):
     from monitor.models import Alert
     Alert.objects.filter(id=alert_id).update(resolved=True)
     return JsonResponse({"ok": True})
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
 def api_scan(request):
     from monitor.auth_utils import can_scan as _can_scan
@@ -278,11 +287,13 @@ def api_scan(request):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_scan_status(request):
     return JsonResponse(_scan_state)
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_network_info(request):
     from monitor.scanner import get_local_interfaces
     try:
@@ -296,11 +307,12 @@ def api_network_info(request):
 # ══════════════════════════════════════════════════════════
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_thresholds(request):
     from monitor.models import Device
     from monitor.tasks import LATENCY_WARNING_MS, LATENCY_ALERT_MS, LOSS_ALERT_PCT
     result = []
-    for d in Device.objects.all().order_by('ip'):
+    for d in Device.objects.filter(active=True).order_by('ip'):
         has_custom = any([
             d.latency_warning  is not None,
             d.latency_critical is not None,
@@ -333,8 +345,8 @@ def api_thresholds(request):
     })
 
 
-@csrf_exempt
 @require_http_methods(["POST"])
+@config_required
 def api_save_threshold(request, device_id):
     from monitor.models import Device
     try:
@@ -366,8 +378,8 @@ def api_save_threshold(request, device_id):
     return JsonResponse({'ok': True, 'device_ip': device.ip})
 
 
-@csrf_exempt
 @require_http_methods(["DELETE"])
+@config_required
 def api_delete_threshold(request, device_id):
     from monitor.models import Device
     Device.objects.filter(id=device_id).update(
@@ -379,6 +391,7 @@ def api_delete_threshold(request, device_id):
 
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def api_monitor_status(request):
     from monitor.models import ScanReport
     from monitor.tasks import (PING_INTERVAL, AUTO_SCAN_INTERVAL, DELETE_OFFLINE,
@@ -409,6 +422,7 @@ def api_monitor_status(request):
 # ══════════════════════════════════════════════════════════
 
 @require_http_methods(["GET"])
+@login_required_ajax
 def exportar_pdf(request, report_id=None):
     try:
         from reportlab.lib.pagesizes import A4
@@ -489,7 +503,7 @@ def exportar_pdf(request, report_id=None):
             story.append(Paragraph("No se pudo obtener info de interfaces.", sN))
         story.append(Spacer(1, .4*cm))
 
-        devs = list(Device.objects.all().order_by("ip"))
+        devs = list(Device.objects.filter(active=True).order_by("ip"))
         on   = [d for d in devs if d.status != "offline"]
 
         story.append(Paragraph("Dispositivos en la Red", sH2))
@@ -582,18 +596,25 @@ def exportar_pdf(request, report_id=None):
 
 def login_view(request):
     from django.contrib.auth import authenticate, login
-    from monitor.auth_utils import ensure_profile
+    from monitor.auth_utils import ensure_profile, is_login_rate_limited, register_failed_login, reset_login_attempts
     if request.user.is_authenticated:
         return redirect('/')
     error = None
     if request.method == 'POST':
+        if is_login_rate_limited(request):
+            return JsonResponse(
+                {'error': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'},
+                status=429,
+            )
         username = request.POST.get('username', '').strip()
         password = request.POST.get('password', '')
         user = authenticate(request, username=username, password=password)
         if user:
+            reset_login_attempts(request)
             login(request, user)
             ensure_profile(user)
             return redirect(request.POST.get('next') or '/')
+        register_failed_login(request)
         error = 'Usuario o contraseña incorrectos'
     return render(request, 'monitor/login.html', {'error': error})
 
@@ -739,7 +760,6 @@ def api_crear_usuario(request):
     return JsonResponse({'ok': True, 'username': username})
 
 
-@csrf_exempt
 @require_http_methods(['POST'])
 def api_editar_usuario(request, user_id):
     from monitor.auth_utils import is_admin
@@ -784,7 +804,6 @@ def api_editar_usuario(request, user_id):
     return JsonResponse({'ok': True})
 
 
-@csrf_exempt
 @require_http_methods(['DELETE'])
 def api_eliminar_usuario(request, user_id):
     from monitor.auth_utils import is_admin
@@ -823,18 +842,24 @@ from rest_framework.authtoken.models import Token
 
 @csrf_exempt
 def api_app_login(request):
+    from monitor.auth_utils import is_login_rate_limited, register_failed_login, reset_login_attempts
     if request.method != 'POST':
         return JsonResponse({'error': 'POST requerido'}, status=405)
+    if is_login_rate_limited(request):
+        return JsonResponse({'error': 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'}, status=429)
     try:
         data = json.loads(request.body)
         user = authenticate(username=data['username'], password=data['password'])
         if user:
+            reset_login_attempts(request)
             token, _ = Token.objects.get_or_create(user=user)
             role = getattr(getattr(user, 'profile', None), 'role', 'viewer')
             return JsonResponse({'token': token.key, 'username': user.username, 'role': role})
+        register_failed_login(request)
         return JsonResponse({'error': 'Credenciales inválidas'}, status=401)
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=400)
+        logger.error(f"api_app_login error: {e}")
+        return JsonResponse({'error': 'Solicitud inválida'}, status=400)
 
 @csrf_exempt
 def api_register_fcm(request):

@@ -39,6 +39,7 @@ FIRST_SCAN_DELAY      = 10    # segundos antes del primer escaneo al arrancar
 LATENCY_WARNING_MS = 150   # ms — estado warning
 LATENCY_ALERT_MS   = 200   # ms — alerta crítica
 LOSS_ALERT_PCT     = 5     # %  — alerta crítica de pérdida
+ALERT_COOLDOWN     = 15 * 60  # segundos — no repetir alerta del mismo tipo/dispositivo antes de esto
 
 # ══════════════════════════════════════════════════════════
 
@@ -52,8 +53,34 @@ def _send_fcm(alert):
         logger.warning(f"[FCM] Error enviando push: {e}")
 
 
+def _recent_duplicate_alert(device, alert_type) -> bool:
+    """True si ya existe una alerta sin resolver del mismo tipo/dispositivo
+    dentro de ALERT_COOLDOWN — evita crear/notificar cientos de alertas
+    repetidas mientras dura un mismo problema."""
+    from monitor.models import Alert
+    from django.utils import timezone
+    import datetime
+    if device is None:
+        return False
+    cutoff = timezone.now() - datetime.timedelta(seconds=ALERT_COOLDOWN)
+    return Alert.objects.filter(
+        device=device, alert_type=alert_type, resolved=False, timestamp__gte=cutoff,
+    ).exists()
+
+
+def _create_alert(device, level, alert_type, message):
+    """Crea la alerta y envía el push, salvo que sea un duplicado reciente
+    (ver ALERT_COOLDOWN). Devuelve la Alert creada o None si se omitió."""
+    from monitor.models import Alert
+    if _recent_duplicate_alert(device, alert_type):
+        return None
+    alert = Alert.objects.create(device=device, level=level, alert_type=alert_type, message=message)
+    _send_fcm(alert)
+    return alert
+
+
 def calculate_qos_score(latency, jitter, loss) -> float:
-    """Puntaje QoS 0-100 basado en modelo ITU-T G.107."""
+    """Índice ponderado 0-100: 50 % latencia, 30 % jitter y 20 % pérdida, con escalas por tramos."""
     if latency is None:
         return 0.0
 
@@ -76,21 +103,25 @@ def calculate_qos_score(latency, jitter, loss) -> float:
     return round(min(100, max(0, lat_score * 0.5 + jit_score * 0.3 + loss_score * 0.2)), 1)
 
 
-def delete_offline_devices():
+def deactivate_offline_devices():
     """
-    Elimina dispositivos que llevan más de OFFLINE_GRACE_HOURS sin verse.
+    Marca como inactivos (active=False) los dispositivos que llevan más de
+    OFFLINE_GRACE_HOURS sin verse, en lugar de eliminarlos: borrarlos arrastra
+    en cascada sus MetricSnapshot y Alert, perdiendo el historial. Un
+    dispositivo inactivo se excluye de las vistas de dispositivos activos
+    pero su historial sigue disponible en la base de datos.
     Esto preserva celulares que se van offline temporalmente (WiFi sleep, batería)
-    y solo elimina equipos genuinamente desaparecidos.
+    y solo desactiva equipos genuinamente desaparecidos.
     """
     from monitor.models import Device
     from django.utils import timezone
     import datetime
     cutoff = timezone.now() - datetime.timedelta(hours=OFFLINE_GRACE_HOURS)
-    qs = Device.objects.filter(status='offline', last_seen__lt=cutoff)
+    qs = Device.objects.filter(status='offline', active=True, last_seen__lt=cutoff)
     count = qs.count()
     if count > 0:
-        qs.delete()
-        logger.info(f"[SCAN] {count} dispositivo(s) offline > {OFFLINE_GRACE_HOURS}h eliminado(s)")
+        qs.update(active=False)
+        logger.info(f"[SCAN] {count} dispositivo(s) offline > {OFFLINE_GRACE_HOURS}h desactivado(s)")
     return count
 
 
@@ -109,6 +140,11 @@ def scan_single_network(iface, progress_callback=None, progress_offset=0, progre
     start_time     = time.time()
 
     logger.info(f"[SCAN] Iniciando red: {target_network} | Gateway: {gateway_ip} | Local: {own_ip}")
+
+    # No avisar "nuevo dispositivo" en el primer escaneo de una red recién
+    # agregada — en ese momento TODOS los equipos son "nuevos" y llenaría de
+    # alertas una instalación inicial.
+    is_first_scan_of_network = not ScanReport.objects.filter(network=target_network).exists()
 
     def cb(pct, msg):
         if progress_callback:
@@ -175,7 +211,14 @@ def scan_single_network(iface, progress_callback=None, progress_offset=0, progre
         device.os_accuracy = os_accuracy
         device.network     = target_network
         device.last_seen   = timezone.now()
+        device.active      = True  # reaparece en un escaneo -> ya no está "desactivado"
         device.save()
+
+        if created and not is_first_scan_of_network:
+            _create_alert(
+                device, 'info', 'new_device',
+                f"Nuevo dispositivo detectado: {ip} ({hostname}, {vendor}) en {target_network}",
+            )
 
         if ping_result.get('latency') is not None:
             MetricSnapshot.objects.create(
@@ -192,31 +235,25 @@ def scan_single_network(iface, progress_callback=None, progress_offset=0, progre
             jit  = ping_result.get('jitter', 0) or 0
 
             if lat > device.get_latency_critical():
-                _a = Alert.objects.create(device=device, level='critical',
-                    message=f"Latencia crítica en {ip}: {lat:.0f}ms (límite: {device.get_latency_critical():.0f}ms)")
-                _send_fcm(_a)
+                _create_alert(device, 'critical', 'latency',
+                    f"Latencia crítica en {ip}: {lat:.0f}ms (límite: {device.get_latency_critical():.0f}ms)")
             elif lat > device.get_latency_warning():
-                _a = Alert.objects.create(device=device, level='warning',
-                    message=f"Latencia alta en {ip}: {lat:.0f}ms (límite: {device.get_latency_warning():.0f}ms)")
-                _send_fcm(_a)
+                _create_alert(device, 'warning', 'latency',
+                    f"Latencia alta en {ip}: {lat:.0f}ms (límite: {device.get_latency_warning():.0f}ms)")
             if loss > device.get_loss_warning():
-                _a = Alert.objects.create(device=device, level='critical',
-                    message=f"Pérdida de paquetes en {ip}: {loss:.1f}% (límite: {device.get_loss_warning():.1f}%)")
-                _send_fcm(_a)
+                _create_alert(device, 'critical', 'loss',
+                    f"Pérdida de paquetes en {ip}: {loss:.1f}% (límite: {device.get_loss_warning():.1f}%)")
             if jit > device.get_jitter_warning():
-                _a = Alert.objects.create(device=device, level='warning',
-                    message=f"Jitter alto en {ip}: {jit:.1f}ms (límite: {device.get_jitter_warning():.1f}ms)")
-                _send_fcm(_a)
+                _create_alert(device, 'warning', 'jitter',
+                    f"Jitter alto en {ip}: {jit:.1f}ms (límite: {device.get_jitter_warning():.1f}ms)")
             if device.get_qos_minimum() > 0 and qos < device.get_qos_minimum():
-                _a = Alert.objects.create(device=device, level='warning',
-                    message=f"QoS bajo en {ip}: {qos:.0f}% (mínimo: {device.get_qos_minimum():.0f}%)")
-                _send_fcm(_a)
+                _create_alert(device, 'warning', 'qos',
+                    f"QoS bajo en {ip}: {qos:.0f}% (mínimo: {device.get_qos_minimum():.0f}%)")
 
         elif not created and not ping_result['alive']:
             if device.status != 'offline':
-                _a = Alert.objects.create(device=device, level='warning',
-                    message=f"Dispositivo {ip} ({hostname}) se desconectó")
-                _send_fcm(_a)
+                _create_alert(device, 'warning', 'disconnect',
+                    f"Dispositivo {ip} ({hostname}) se desconectó")
 
         devices_data.append({
             'ip': ip, 'mac': mac, 'hostname': hostname, 'vendor': vendor,
@@ -261,8 +298,8 @@ def run_scan(network=None, progress_callback=None) -> dict:
     if progress_callback:
         progress_callback(2, 'Limpiando dispositivos desconectados...')
 
-    # Limpiar solo dispositivos offline por más de OFFLINE_GRACE_HOURS (no eliminar recientes)
-    delete_offline_devices()
+    # Desactivar solo dispositivos offline por más de OFFLINE_GRACE_HOURS (no afecta a los recientes)
+    deactivate_offline_devices()
 
     if progress_callback:
         progress_callback(5, 'Detectando interfaces de red...')
@@ -370,9 +407,8 @@ def quick_ping_cycle() -> bool:
                         new_status = 'offline'
 
             if new_status != device.status and new_status == 'offline':
-                _a = Alert.objects.create(device=device, level='critical',
-                    message=f"{device.ip} ({device.hostname}) se desconectó [{device.network}]")
-                _send_fcm(_a)
+                _create_alert(device, 'critical', 'disconnect',
+                    f"{device.ip} ({device.hostname}) se desconectó [{device.network}]")
                 anomaly_detected = True
 
             if result['alive'] and new_status != 'offline':
@@ -381,23 +417,15 @@ def quick_ping_cycle() -> bool:
                 jit  = result.get('jitter') or 0
 
                 if lat and lat > device.get_latency_critical():
-                    _a = Alert.objects.create(device=device, level='critical',
-                        message=f"Latencia critica en {device.ip}: {lat:.0f}ms")
-                    _send_fcm(_a)
+                    _create_alert(device, 'critical', 'latency', f"Latencia critica en {device.ip}: {lat:.0f}ms")
                     anomaly_detected = True
                 if loss and loss > device.get_loss_warning():
-                    _a = Alert.objects.create(device=device, level='critical',
-                        message=f"Perdida en {device.ip}: {loss:.1f}%")
-                    _send_fcm(_a)
+                    _create_alert(device, 'critical', 'loss', f"Perdida en {device.ip}: {loss:.1f}%")
                     anomaly_detected = True
                 if jit and jit > device.get_jitter_warning():
-                    _a = Alert.objects.create(device=device, level='warning',
-                        message=f"Jitter alto en {device.ip}: {jit:.1f}ms")
-                    _send_fcm(_a)
+                    _create_alert(device, 'warning', 'jitter', f"Jitter alto en {device.ip}: {jit:.1f}ms")
                 if device.get_qos_minimum() > 0 and qos < device.get_qos_minimum():
-                    _a = Alert.objects.create(device=device, level='warning',
-                        message=f"QoS bajo en {device.ip}: {qos:.0f}%")
-                    _send_fcm(_a)
+                    _create_alert(device, 'warning', 'qos', f"QoS bajo en {device.ip}: {qos:.0f}%")
 
             device.status    = new_status
             device.last_seen = timezone.now()

@@ -1,0 +1,11 @@
+venv/
+__pycache__/
+*.pyc
+data/
+.env
+.env.example
+firebase-credentials.json
+.git/
+.agents/
+.claude/
+staticfiles/

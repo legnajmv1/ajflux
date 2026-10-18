@@ -8,18 +8,48 @@ Roles:
 from functools import wraps
 from django.shortcuts import redirect
 from django.http import JsonResponse
+from django.core.cache import cache
+
+LOGIN_RATE_LIMIT  = 5
+LOGIN_RATE_WINDOW = 15 * 60  # segundos
+
+
+def get_client_ip(request):
+    """CF-Connecting-IP si viene detrás de Cloudflare Tunnel; si no, REMOTE_ADDR."""
+    return request.META.get('HTTP_CF_CONNECTING_IP') or request.META.get('REMOTE_ADDR', '0.0.0.0')
+
+
+def is_login_rate_limited(request):
+    return cache.get(f'login_attempts:{get_client_ip(request)}', 0) >= LOGIN_RATE_LIMIT
+
+
+def register_failed_login(request):
+    key = f'login_attempts:{get_client_ip(request)}'
+    cache.set(key, cache.get(key, 0) + 1, LOGIN_RATE_WINDOW)
+
+
+def reset_login_attempts(request):
+    cache.delete(f'login_attempts:{get_client_ip(request)}')
 
 
 def login_required_ajax(view_func):
+    """Para endpoints de API/descarga: 401 JSON si no hay sesión o token válido."""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            if request.path.startswith('/api/'):
-                return JsonResponse(
-                    {'error': 'No autenticado', 'redirect': '/login/'},
-                    status=401
-                )
-            return redirect(f'/login/?next={request.path}')
+            return JsonResponse({'error': 'No autenticado', 'redirect': '/login/'}, status=401)
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def config_required(view_func):
+    """admin u operator — para las vistas de escritura (resolver alertas, umbrales)."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'No autenticado'}, status=401)
+        if not can_config(request.user):
+            return JsonResponse({'error': 'Sin permisos de configuración'}, status=403)
         return view_func(request, *args, **kwargs)
     return wrapper
 

@@ -5,17 +5,8 @@ class MonitorConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'monitor'
 
-    def ready(self):
-        import os
-        if os.environ.get('RUN_MAIN') == 'true':
-            try:
-                from monitor.tasks import start_background_monitor
-                start_background_monitor()
-            except Exception as e:
-                print(f"[AJFLUX] Monitor background no pudo iniciar: {e}")
-
-
-
-
-#------ sudo venv/bin/python manage.py runserver 0.0.0.0:8000
-#------ cloudflared tunnel --url http://localhost:8000
+    # El monitoreo en segundo plano YA NO arranca aquí. Con gunicorn (varios
+    # workers) o varios procesos de runserver, cada uno ejecutaría su propio
+    # monitor_loop y duplicaría pings/escaneos/alertas. Ahora arranca
+    # únicamente desde su propio proceso: `python manage.py run_monitor`
+    # (ver docker-compose.yml, servicio "monitor").
