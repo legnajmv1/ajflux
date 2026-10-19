@@ -8,7 +8,6 @@ services:
     # igual a este puerto una vez configurado).
     ports:
       - "127.0.0.1:8000:8000"
-      - "192.168.1.209:8000:8000"
     restart: unless-stopped
     env_file: .env
     volumes:
