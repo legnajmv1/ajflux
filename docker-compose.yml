@@ -30,7 +30,7 @@ services:
 
   tunnel:
     image: cloudflare/cloudflared:latest
-    command: tunnel run
+    command: tunnel --protocol http2 run
     network_mode: host
     restart: unless-stopped
     env_file: .env
